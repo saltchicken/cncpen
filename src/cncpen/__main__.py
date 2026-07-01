@@ -8,6 +8,7 @@ from ezdxf.path import make_path
 from gscrib import GCodeBuilder
 from shapely.geometry import LineString
 from shapely.geometry import Polygon
+from shapely import affinity
 
 
 @dataclass
@@ -74,7 +75,7 @@ class PenTool():
         self.tool_off()
 
 
-def generate_zigzag_fill(points, spacing):
+def generate_zigzag_fill(points, spacing, angle=0.0):
     """
     Generates back-and-forth (zig-zag) fill paths for a closed polygon.
     """
@@ -88,6 +89,13 @@ def generate_zigzag_fill(points, spacing):
         poly = poly.buffer(0)
         if poly.area == 0:
             return []
+
+    # Store the centroid to act as our pivot point for rotation
+    centroid = poly.centroid
+
+    # Rotate the polygon so our target angle aligns horizontally
+    if angle != 0.0:
+        poly = affinity.rotate(poly, -angle, origin=centroid)
 
     # Buffering can result in a MultiPolygon
     polygons = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
@@ -131,6 +139,10 @@ def generate_zigzag_fill(points, spacing):
                 lines.reverse()
 
             for line in lines:
+                # Rotate the line back to the original orientation
+                if angle != 0.0:
+                    line = affinity.rotate(line, angle, origin=centroid)
+                
                 coords = list(line.coords)
                 if not left_to_right:
                     coords.reverse()
@@ -195,6 +207,10 @@ def main():
                         type=float,
                         default=1.0,
                         help="Distance between fill lines (default: 1.0)")
+    parser.add_argument("--angle",
+                        type=float,
+                        default=0.0,
+                        help="Angle of the zig-zag fill in degrees (default: 0.0)")
 
     args = parser.parse_args()
 
@@ -220,7 +236,7 @@ def main():
 
                 # Check if path is closed (start and end points overlap)
                 if math.hypot(dx, dy) < 0.01:
-                    fill_paths = generate_zigzag_fill(pts, args.spacing)
+                    fill_paths = generate_zigzag_fill(pts, args.spacing, angle=args.angle)
                     for f_pts in fill_paths:
                         pen.draw_path(f_pts)
 
