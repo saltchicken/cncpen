@@ -1,3 +1,7 @@
+import argparse
+import sys
+import ezdxf
+from ezdxf.path import make_path
 from dataclasses import dataclass
 from gscrib import GCodeBuilder
 
@@ -56,18 +60,63 @@ class PenTool():
             self.g.move(x=x, y=y, f=self.config.feed_rate)
         self.tool_off()
 
+def extract_dxf_paths(filepath, flatten_distance=0.1):
+    """
+    Reads a DXF file and converts geometric entities into a list of point lists.
+    flatten_distance determines the maximum distance between the true curve 
+    and the approximated line segments for arcs/splines.
+    """
+    try:
+        doc = ezdxf.readfile(filepath)
+    except Exception as e:
+        print(f"Error reading DXF file '{filepath}': {e}", file=sys.stderr)
+        sys.exit(1)
+
+    msp = doc.modelspace()
+    paths = []
+
+    # DXF entities that can be reliably converted into paths
+    supported_types = {'LINE', 'LWPOLYLINE', 'POLYLINE', 'CIRCLE', 'ARC', 'ELLIPSE', 'SPLINE'}
+
+    for entity in msp:
+        if entity.dxftype() in supported_types:
+            try:
+                # Convert the entity into an ezdxf Path object
+                p = make_path(entity)
+                
+                # Flatten the path (turns curves into line segments)
+                # This yields Vec3 objects. We only care about X and Y.
+                vertices = list(p.flattening(flatten_distance))
+                
+                if vertices:
+                    paths.append([(v.x, v.y) for v in vertices])
+            except Exception as e:
+                print(f"Warning: could not process {entity.dxftype()} entity: {e}", file=sys.stderr)
+
+    return paths
 
 def main():
+    parser = argparse.ArgumentParser(description="Generate CNC G-code from a DXF file using a pen tool.")
+    parser.add_argument("dxf_file", help="Path to the input DXF file")
+    parser.add_argument("-o", "--output", default="output.nc", help="Output G-code filename (default: output.nc)")
+    parser.add_argument("--feed", type=float, default=400.0, help="Drawing feed rate (default: 400.0)")
+    args = parser.parse_args()
 
-    config = PenConfig()
+    print(f"Reading geometry from {args.dxf_file}...")
+    paths_to_draw = extract_dxf_paths(args.dxf_file)
+    print(f"Extracted {len(paths_to_draw)} draw operations.")
+
+    if not paths_to_draw:
+        print("No drawable paths found. Exiting.")
+        sys.exit(0)
+
+    config = PenConfig(feed_rate=args.feed)
     
-    with PenTool(config) as pen:
-        # Object 1
-        pen.draw_path([(20, 20), (20, 40), (40, 40), (40, 20), (20, 20)])
-        
-        # Object 2
-        pen.draw_path([(60, 60), (60, 80), (80, 80), (80, 60), (60, 60)])
-        pen.draw_path([(70, 70), (70, 75), (75, 75), (75, 70), (70, 70)])
+    with PenTool(config, output_filename=args.output) as pen:
+        for pts in paths_to_draw:
+            pen.draw_path(pts)
+            
+    print(f"G-code successfully saved to {args.output}")
 
 if __name__ == "__main__":
     main()
