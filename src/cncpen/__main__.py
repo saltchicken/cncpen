@@ -1,9 +1,11 @@
 import argparse
 import sys
+import math
 import ezdxf
 from ezdxf.path import make_path
 from dataclasses import dataclass
 from gscrib import GCodeBuilder
+from shapely.geometry import Polygon, LineString
 
 @dataclass
 class PenConfig:
@@ -13,7 +15,7 @@ class PenConfig:
     down_z: float = -1.0
 
 class PenTool():
-    def __init__(self, config: PenConfig, output_filename = "output.nc"):
+    def __init__(self, config: PenConfig, output_filename="output.nc"):
         self.g = GCodeBuilder(output=output_filename)
         self.config = config
 
@@ -60,11 +62,79 @@ class PenTool():
             self.g.move(x=x, y=y, f=self.config.feed_rate)
         self.tool_off()
 
+
+def generate_zigzag_fill(points, spacing):
+    """
+    Generates back-and-forth (zig-zag) fill paths for a closed polygon.
+    """
+    if len(points) < 4:
+        return []
+        
+    poly = Polygon(points)
+    
+    # Attempt to buffer out slight self-intersections (e.g. figure-8 loops)
+    if not poly.is_valid or poly.area == 0:
+        poly = poly.buffer(0)
+        if poly.area == 0:
+            return []
+
+    # Buffering can result in a MultiPolygon
+    polygons = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
+    all_fill_paths = []
+    
+    for p in polygons:
+        minx, miny, maxx, maxy = p.bounds
+        y = miny + spacing
+        
+        left_to_right = True
+        
+        while y <= maxy:
+            # Create a scanline that completely covers the bounding box horizontally
+            scanline = LineString([(minx - 1, y), (maxx + 1, y)])
+            intersection = p.intersection(scanline)
+            
+            if intersection.is_empty:
+                y += spacing
+                continue
+            
+            # Extract standard LineStrings from the intersection result
+            lines = []
+            if intersection.geom_type == 'LineString':
+                lines.append(intersection)
+            elif intersection.geom_type == 'MultiLineString':
+                lines.extend(list(intersection.geoms))
+            elif intersection.geom_type == 'GeometryCollection':
+                for geom in intersection.geoms:
+                    if geom.geom_type == 'LineString':
+                        lines.append(geom)
+
+            if not lines:
+                y += spacing
+                continue
+            
+            # Sort the cut segments left-to-right to maintain logical travel moves
+            lines.sort(key=lambda l: l.coords[0][0])
+            
+            # If we are travelling right-to-left, flip the segments and their contents
+            if not left_to_right:
+                lines.reverse()
+                
+            for line in lines:
+                coords = list(line.coords)
+                if not left_to_right:
+                    coords.reverse()
+                all_fill_paths.append(coords)
+            
+            # Flip direction for the next horizontal line
+            left_to_right = not left_to_right
+            y += spacing
+
+    return all_fill_paths
+
+
 def extract_dxf_paths(filepath, flatten_distance=0.1):
     """
     Reads a DXF file and converts geometric entities into a list of point lists.
-    flatten_distance determines the maximum distance between the true curve 
-    and the approximated line segments for arcs/splines.
     """
     try:
         doc = ezdxf.readfile(filepath)
@@ -75,17 +145,12 @@ def extract_dxf_paths(filepath, flatten_distance=0.1):
     msp = doc.modelspace()
     paths = []
 
-    # DXF entities that can be reliably converted into paths
     supported_types = {'LINE', 'LWPOLYLINE', 'POLYLINE', 'CIRCLE', 'ARC', 'ELLIPSE', 'SPLINE'}
 
     for entity in msp:
         if entity.dxftype() in supported_types:
             try:
-                # Convert the entity into an ezdxf Path object
                 p = make_path(entity)
-                
-                # Flatten the path (turns curves into line segments)
-                # This yields Vec3 objects. We only care about X and Y.
                 vertices = list(p.flattening(flatten_distance))
                 
                 if vertices:
@@ -95,11 +160,15 @@ def extract_dxf_paths(filepath, flatten_distance=0.1):
 
     return paths
 
+
 def main():
     parser = argparse.ArgumentParser(description="Generate CNC G-code from a DXF file using a pen tool.")
     parser.add_argument("dxf_file", help="Path to the input DXF file")
     parser.add_argument("-o", "--output", default="output.nc", help="Output G-code filename (default: output.nc)")
     parser.add_argument("--feed", type=float, default=400.0, help="Drawing feed rate (default: 400.0)")
+    parser.add_argument("--fill", action="store_true", help="Enable zig-zag fill for closed shapes")
+    parser.add_argument("--spacing", type=float, default=1.0, help="Distance between fill lines (default: 1.0)")
+    
     args = parser.parse_args()
 
     print(f"Reading geometry from {args.dxf_file}...")
@@ -114,7 +183,19 @@ def main():
     
     with PenTool(config, output_filename=args.output) as pen:
         for pts in paths_to_draw:
+            # 1. Draw the outer boundary / standard lines
             pen.draw_path(pts)
+            
+            # 2. Draw the infill if enabled, and if the path is closed
+            if args.fill and len(pts) > 2:
+                dx = pts[0][0] - pts[-1][0]
+                dy = pts[0][1] - pts[-1][1]
+                
+                # Check if path is closed (start and end points overlap)
+                if math.hypot(dx, dy) < 0.01:
+                    fill_paths = generate_zigzag_fill(pts, args.spacing)
+                    for f_pts in fill_paths:
+                        pen.draw_path(f_pts)
             
     print(f"G-code successfully saved to {args.output}")
 
