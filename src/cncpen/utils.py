@@ -1,5 +1,6 @@
 import ezdxf
 from ezdxf.path import make_path
+import sys
 
 
 def extract_dxf_paths(filepath, flatten_distance=0.1):
