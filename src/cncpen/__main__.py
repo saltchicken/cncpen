@@ -114,8 +114,8 @@ def main():
     parser.add_argument("dxf_file", help="Path to the input DXF file")
     parser.add_argument("-o",
                         "--output",
-                        default="output.nc",
-                        help="Output G-code filename (default: output.nc)")
+                        default=None,
+                        help="Output G-code filename (default: matches input filename with .nc extension)")
     parser.add_argument("--feed",
                         type=float,
                         default=400.0,
@@ -149,7 +149,12 @@ def main():
 
     args = parser.parse_args()
 
+    if args.output is None:
+        base_name = os.path.splitext(args.dxf_file)[0]
+        args.output = f"{base_name}.nc"
+
     print(f"Reading geometry from {args.dxf_file}...")
+
     paths_to_draw = extract_dxf_paths(args.dxf_file)
     print(f"Extracted {len(paths_to_draw)} draw operations.")
 
