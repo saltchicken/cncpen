@@ -1,11 +1,13 @@
 import ezdxf
 from ezdxf.path import make_path
 import sys
-
+from shapely.geometry import LineString, MultiLineString
+from shapely.ops import linemerge
 
 def extract_dxf_paths(filepath, flatten_distance=0.1):
     """
-    Reads a DXF file and converts geometric entities into a list of point lists.
+    Reads a DXF file, flattens entities, and stitches disconnected 
+    segments together to heal poor SVG-to-DXF conversions.
     """
     try:
         doc = ezdxf.readfile(filepath)
@@ -14,23 +16,39 @@ def extract_dxf_paths(filepath, flatten_distance=0.1):
         sys.exit(1)
 
     msp = doc.modelspace()
-    paths = []
+    raw_lines = []
 
     supported_types = {
         'LINE', 'LWPOLYLINE', 'POLYLINE', 'CIRCLE', 'ARC', 'ELLIPSE', 'SPLINE'
     }
 
+    # 1. Extract everything as raw Shapely LineStrings
     for entity in msp:
         if entity.dxftype() in supported_types:
             try:
                 p = make_path(entity)
                 vertices = list(p.flattening(flatten_distance))
 
-                if vertices:
-                    paths.append([(v.x, v.y) for v in vertices])
+                if len(vertices) > 1:
+                    raw_lines.append(LineString([(v.x, v.y) for v in vertices]))
             except Exception as e:
                 print(
                     f"Warning: could not process {entity.dxftype()} entity: {e}",
                     file=sys.stderr)
+
+    if not raw_lines:
+        return []
+
+    # 2. Stitch touching line segments together
+    merged_geometry = linemerge(raw_lines)
+
+    paths = []
+    
+    # 3. Format back into point lists for the CNC pen
+    if isinstance(merged_geometry, LineString):
+        paths.append(list(merged_geometry.coords))
+    elif isinstance(merged_geometry, MultiLineString):
+        for line in merged_geometry.geoms:
+            paths.append(list(line.coords))
 
     return paths
