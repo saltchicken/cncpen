@@ -2,6 +2,7 @@ import argparse
 from dataclasses import dataclass
 import math
 import sys
+import os
 
 import ezdxf
 from ezdxf.path import make_path
@@ -124,7 +125,7 @@ def main():
                         help="Enable infill for closed shapes")
     parser.add_argument(
         "--pattern",
-        choices=["zigzag", "sine"],
+        choices=["zigzag", "sine", "concentric"],
         default="zigzag",
         help="Fill pattern to use if --fill is enabled (default: zigzag)")
     parser.add_argument("--spacing",
@@ -177,10 +178,15 @@ def main():
                             amplitude=args.amplitude,
                             wavelength=args.wavelength,
                             angle=args.angle)
+                    elif args.pattern == "concentric":
+                        fill_paths = generate_concentric_fill(
+                            pts,
+                            spacing=args.spacing)
                     else:
-                        fill_paths = generate_zigzag_fill(pts,
-                                                          spacing=args.spacing,
-                                                          angle=args.angle)
+                        fill_paths = generate_zigzag_fill(
+                            pts,
+                            spacing=args.spacing,
+                            angle=args.angle)
 
                     for f_pts in fill_paths:
                         pen.draw_path(f_pts)
