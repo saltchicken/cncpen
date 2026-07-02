@@ -2,21 +2,30 @@ import math
 import random
 from shapely import affinity
 from shapely.geometry import LineString, Polygon, Point
+from shapely.geometry.base import BaseGeometry
 
 
-def generate_zigzag_fill(points, spacing, angle=0.0):
+def _ensure_geom(shape):
+    """Helper to handle either a raw list of points or a Shapely geometry."""
+    if isinstance(shape, BaseGeometry):
+        poly = shape
+    elif len(shape) < 4:
+        poly = Polygon()
+    else:
+        poly = Polygon(shape)
+        
+    if not poly.is_valid or poly.area == 0:
+        poly = poly.buffer(0)
+    return poly
+
+
+def generate_zigzag_fill(shape, spacing, angle=0.0):
     """
     Generates back-and-forth (zig-zag) fill paths for a closed polygon.
     """
-    if len(points) < 4:
+    poly = _ensure_geom(shape)
+    if poly.is_empty or poly.area == 0:
         return []
-
-    poly = Polygon(points)
-
-    if not poly.is_valid or poly.area == 0:
-        poly = poly.buffer(0)
-        if poly.area == 0:
-            return []
 
     centroid = poly.centroid
 
@@ -75,7 +84,7 @@ def generate_zigzag_fill(points, spacing, angle=0.0):
     return all_fill_paths
 
 
-def generate_sinewave_fill(points,
+def generate_sinewave_fill(shape,
                            spacing,
                            amplitude=1.0,
                            wavelength=5.0,
@@ -83,15 +92,9 @@ def generate_sinewave_fill(points,
     """
     Generates back-and-forth sine wave fill paths for a closed polygon.
     """
-    if len(points) < 4:
+    poly = _ensure_geom(shape)
+    if poly.is_empty or poly.area == 0:
         return []
-
-    poly = Polygon(points)
-
-    if not poly.is_valid or poly.area == 0:
-        poly = poly.buffer(0)
-        if poly.area == 0:
-            return []
 
     centroid = poly.centroid
 
@@ -163,19 +166,13 @@ def generate_sinewave_fill(points,
     return all_fill_paths
 
 
-def generate_concentric_fill(points, spacing, simplify_tolerance=0.2):
+def generate_concentric_fill(shape, spacing, simplify_tolerance=0.2):
     """
     Generates concentric (inset) fill paths for a closed polygon.
     """
-    if len(points) < 4:
+    poly = _ensure_geom(shape)
+    if poly.is_empty or poly.area == 0:
         return []
-
-    poly = Polygon(points)
-
-    if not poly.is_valid or poly.area == 0:
-        poly = poly.buffer(0)
-        if poly.area == 0:
-            return []
 
     all_fill_paths = []
 
@@ -198,20 +195,27 @@ def generate_concentric_fill(points, spacing, simplify_tolerance=0.2):
 
     return all_fill_paths
 
-def generate_lichtenberg_fill(points, spacing, nodes_count=1000):
+
+def generate_lichtenberg_fill(shape, spacing, nodes_count=1000):
     """
     Generates a Lichtenberg-style (branching fractal) fill using an RRT
     (Rapidly-exploring Random Tree) algorithm confined to the polygon.
     """
-    if len(points) < 4:
+    poly = _ensure_geom(shape)
+    if poly.is_empty or poly.area == 0:
         return []
 
-    poly = Polygon(points)
-
-    if not poly.is_valid or poly.area == 0:
-        poly = poly.buffer(0)
-        if poly.area == 0:
-            return []
+    # If we have disconnected islands, run the RRT on each island separately
+    # so we don't get stuck failing to jump across empty voids.
+    if poly.geom_type in ('MultiPolygon', 'GeometryCollection'):
+        all_paths = []
+        total_area = poly.area
+        for geom in poly.geoms:
+            if geom.area > 0:
+                # Distribute the node count proportionally based on the island's area
+                island_nodes = max(10, int(nodes_count * (geom.area / total_area)))
+                all_paths.extend(generate_lichtenberg_fill(geom, spacing, island_nodes))
+        return all_paths
 
     minx, miny, maxx, maxy = poly.bounds
 

@@ -3,6 +3,9 @@ from dataclasses import dataclass
 import math
 import os
 import sys
+from functools import reduce
+import operator
+from shapely.geometry import Polygon
 
 from gscrib import GCodeBuilder
 
@@ -149,41 +152,55 @@ def main():
     config = PenConfig(feed_rate=args.feed)
 
     with PenTool(config, output_filename=args.output) as pen:
+        closed_polys = []
+
+        # 1. Draw all outlines and collect closed shapes
         for pts in paths_to_draw:
-            # 1. Draw the outer boundary / standard lines
+            # Draw the outer boundary / standard lines
             # Pass clearance=True to safely hop over screws/clamps to the new entity
             pen.draw_path(pts, clearance=True)
 
-            # 2. Draw the infill if enabled, and if the path is closed
+            # 2. Collect closed shapes if fill is enabled
             if args.fill and len(pts) > 2:
                 dx = pts[0][0] - pts[-1][0]
                 dy = pts[0][1] - pts[-1][1]
 
                 # Check if path is closed (start and end points overlap)
                 if math.hypot(dx, dy) < 0.01:
-                    if args.pattern == "sine":
-                        fill_paths = generate_sinewave_fill(
-                            pts,
-                            spacing=args.spacing,
-                            amplitude=args.amplitude,
-                            wavelength=args.wavelength,
-                            angle=args.angle)
-                    elif args.pattern == "concentric":
-                        fill_paths = generate_concentric_fill(
-                            pts, spacing=args.spacing, simplify_tolerance=args.simplify)
-                    elif args.pattern == "lichtenberg":
-                        # Dispatch the new fill here
-                        fill_paths = generate_lichtenberg_fill(
-                            pts, spacing=args.spacing, nodes_count=args.nodes)
+                    poly = Polygon(pts)
+                    if poly.is_valid and poly.area > 0:
+                        closed_polys.append(poly)
                     else:
-                        fill_paths = generate_zigzag_fill(pts,
-                                                          spacing=args.spacing,
-                                                          angle=args.angle)
+                        poly = poly.buffer(0) # Attempt to fix self-intersections
+                        if poly.area > 0:
+                            closed_polys.append(poly)
 
-                    for f_pts in fill_paths:
-                        # For fills, clearance is False. The pen will just hop 
-                        # between fill lines at rapid_z.
-                        pen.draw_path(f_pts, clearance=False)
+        # 3. Process Fills using the Even-Odd Rule
+        if args.fill and closed_polys:
+            # XOR all closed paths to automatically punch out holes
+            combined_geom = reduce(operator.xor, closed_polys)
+
+            if args.pattern == "sine":
+                fill_paths = generate_sinewave_fill(
+                    combined_geom,
+                    spacing=args.spacing,
+                    amplitude=args.amplitude,
+                    wavelength=args.wavelength,
+                    angle=args.angle)
+            elif args.pattern == "concentric":
+                fill_paths = generate_concentric_fill(
+                    combined_geom, spacing=args.spacing, simplify_tolerance=args.simplify)
+            elif args.pattern == "lichtenberg":
+                fill_paths = generate_lichtenberg_fill(
+                    combined_geom, spacing=args.spacing, nodes_count=args.nodes)
+            else:
+                fill_paths = generate_zigzag_fill(
+                    combined_geom, spacing=args.spacing, angle=args.angle)
+
+            for f_pts in fill_paths:
+                # For fills, clearance is False. The pen will just hop 
+                # between fill lines at rapid_z.
+                pen.draw_path(f_pts, clearance=False)
 
     print(f"G-code successfully saved to {args.output}")
 
