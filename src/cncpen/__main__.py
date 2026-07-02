@@ -6,9 +6,8 @@ import sys
 import ezdxf
 from ezdxf.path import make_path
 from gscrib import GCodeBuilder
-from shapely.geometry import LineString
-from shapely.geometry import Polygon
-from shapely import affinity
+
+from .fills import *
 
 
 @dataclass
@@ -75,86 +74,6 @@ class PenTool():
         self.tool_off()
 
 
-def generate_zigzag_fill(points, spacing, angle=0.0):
-    """
-    Generates back-and-forth (zig-zag) fill paths for a closed polygon.
-    """
-    if len(points) < 4:
-        return []
-
-    poly = Polygon(points)
-
-    # Attempt to buffer out slight self-intersections (e.g. figure-8 loops)
-    if not poly.is_valid or poly.area == 0:
-        poly = poly.buffer(0)
-        if poly.area == 0:
-            return []
-
-    # Store the centroid to act as our pivot point for rotation
-    centroid = poly.centroid
-
-    # Rotate the polygon so our target angle aligns horizontally
-    if angle != 0.0:
-        poly = affinity.rotate(poly, -angle, origin=centroid)
-
-    # Buffering can result in a MultiPolygon
-    polygons = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
-    all_fill_paths = []
-
-    for p in polygons:
-        minx, miny, maxx, maxy = p.bounds
-        y = miny + spacing
-
-        left_to_right = True
-
-        while y <= maxy:
-            # Create a scanline that completely covers the bounding box horizontally
-            scanline = LineString([(minx - 1, y), (maxx + 1, y)])
-            intersection = p.intersection(scanline)
-
-            if intersection.is_empty:
-                y += spacing
-                continue
-
-            # Extract standard LineStrings from the intersection result
-            lines = []
-            if intersection.geom_type == 'LineString':
-                lines.append(intersection)
-            elif intersection.geom_type == 'MultiLineString':
-                lines.extend(list(intersection.geoms))
-            elif intersection.geom_type == 'GeometryCollection':
-                for geom in intersection.geoms:
-                    if geom.geom_type == 'LineString':
-                        lines.append(geom)
-
-            if not lines:
-                y += spacing
-                continue
-
-            # Sort the cut segments left-to-right to maintain logical travel moves
-            lines.sort(key=lambda l: l.coords[0][0])
-
-            # If we are travelling right-to-left, flip the segments and their contents
-            if not left_to_right:
-                lines.reverse()
-
-            for line in lines:
-                # Rotate the line back to the original orientation
-                if angle != 0.0:
-                    line = affinity.rotate(line, angle, origin=centroid)
-                
-                coords = list(line.coords)
-                if not left_to_right:
-                    coords.reverse()
-                all_fill_paths.append(coords)
-
-            # Flip direction for the next horizontal line
-            left_to_right = not left_to_right
-            y += spacing
-
-    return all_fill_paths
-
-
 def extract_dxf_paths(filepath, flatten_distance=0.1):
     """
     Reads a DXF file and converts geometric entities into a list of point lists.
@@ -202,7 +121,12 @@ def main():
                         help="Drawing feed rate (default: 400.0)")
     parser.add_argument("--fill",
                         action="store_true",
-                        help="Enable zig-zag fill for closed shapes")
+                        help="Enable infill for closed shapes")
+    parser.add_argument(
+        "--pattern",
+        choices=["zigzag", "sine"],
+        default="zigzag",
+        help="Fill pattern to use if --fill is enabled (default: zigzag)")
     parser.add_argument("--spacing",
                         type=float,
                         default=1.0,
@@ -210,7 +134,17 @@ def main():
     parser.add_argument("--angle",
                         type=float,
                         default=0.0,
-                        help="Angle of the zig-zag fill in degrees (default: 0.0)")
+                        help="Angle of the fill in degrees (default: 0.0)")
+    parser.add_argument(
+        "--amplitude",
+        type=float,
+        default=1.0,
+        help="Amplitude for the sine wave pattern (default: 1.0)")
+    parser.add_argument(
+        "--wavelength",
+        type=float,
+        default=5.0,
+        help="Wavelength for the sine wave pattern (default: 5.0)")
 
     args = parser.parse_args()
 
@@ -236,7 +170,18 @@ def main():
 
                 # Check if path is closed (start and end points overlap)
                 if math.hypot(dx, dy) < 0.01:
-                    fill_paths = generate_zigzag_fill(pts, args.spacing, angle=args.angle)
+                    if args.pattern == "sine":
+                        fill_paths = generate_sinewave_fill(
+                            pts,
+                            spacing=args.spacing,
+                            amplitude=args.amplitude,
+                            wavelength=args.wavelength,
+                            angle=args.angle)
+                    else:
+                        fill_paths = generate_zigzag_fill(pts,
+                                                          spacing=args.spacing,
+                                                          angle=args.angle)
+
                     for f_pts in fill_paths:
                         pen.draw_path(f_pts)
 
