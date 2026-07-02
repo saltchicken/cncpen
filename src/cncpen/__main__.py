@@ -1,14 +1,13 @@
 import argparse
 from dataclasses import dataclass
 import math
-import sys
 import os
+import sys
 
-import ezdxf
-from ezdxf.path import make_path
 from gscrib import GCodeBuilder
 
 from .fills import *
+from .utils import extract_dxf_paths
 
 
 @dataclass
@@ -75,47 +74,17 @@ class PenTool():
         self.tool_off()
 
 
-def extract_dxf_paths(filepath, flatten_distance=0.1):
-    """
-    Reads a DXF file and converts geometric entities into a list of point lists.
-    """
-    try:
-        doc = ezdxf.readfile(filepath)
-    except Exception as e:
-        print(f"Error reading DXF file '{filepath}': {e}", file=sys.stderr)
-        sys.exit(1)
-
-    msp = doc.modelspace()
-    paths = []
-
-    supported_types = {
-        'LINE', 'LWPOLYLINE', 'POLYLINE', 'CIRCLE', 'ARC', 'ELLIPSE', 'SPLINE'
-    }
-
-    for entity in msp:
-        if entity.dxftype() in supported_types:
-            try:
-                p = make_path(entity)
-                vertices = list(p.flattening(flatten_distance))
-
-                if vertices:
-                    paths.append([(v.x, v.y) for v in vertices])
-            except Exception as e:
-                print(
-                    f"Warning: could not process {entity.dxftype()} entity: {e}",
-                    file=sys.stderr)
-
-    return paths
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Generate CNC G-code from a DXF file using a pen tool.")
     parser.add_argument("dxf_file", help="Path to the input DXF file")
-    parser.add_argument("-o",
-                        "--output",
-                        default=None,
-                        help="Output G-code filename (default: matches input filename with .nc extension)")
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=None,
+        help=
+        "Output G-code filename (default: matches input filename with .nc extension)"
+    )
     parser.add_argument("--feed",
                         type=float,
                         default=400.0,
@@ -185,13 +154,11 @@ def main():
                             angle=args.angle)
                     elif args.pattern == "concentric":
                         fill_paths = generate_concentric_fill(
-                            pts,
-                            spacing=args.spacing)
+                            pts, spacing=args.spacing)
                     else:
-                        fill_paths = generate_zigzag_fill(
-                            pts,
-                            spacing=args.spacing,
-                            angle=args.angle)
+                        fill_paths = generate_zigzag_fill(pts,
+                                                          spacing=args.spacing,
+                                                          angle=args.angle)
 
                     for f_pts in fill_paths:
                         pen.draw_path(f_pts)
