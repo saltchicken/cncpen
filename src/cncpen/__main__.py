@@ -119,6 +119,11 @@ def main():
     parser.add_argument("--nodes", type=int, default=1500,
                         help="Number of branches/nodes for Lichtenberg fill (default: 1500)")
 
+    parser.add_argument("--simplify",
+                        type=float,
+                        default=0.2,
+                        help="Simplification tolerance for fills. Higher value = fewer G-code lines (default: 0.2)")
+
     args = parser.parse_args()
 
     if args.output is None:
@@ -157,7 +162,7 @@ def main():
                             angle=args.angle)
                     elif args.pattern == "concentric":
                         fill_paths = generate_concentric_fill(
-                            pts, spacing=args.spacing)
+                            pts, spacing=args.spacing, simplify_tolerance=args.simplify)
                     elif args.pattern == "lichtenberg":
                         # Dispatch the new fill here
                         fill_paths = generate_lichtenberg_fill(

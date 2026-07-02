@@ -160,7 +160,7 @@ def generate_sinewave_fill(points,
     return all_fill_paths
 
 
-def generate_concentric_fill(points, spacing):
+def generate_concentric_fill(points, spacing, simplify_tolerance=0.2):
     """
     Generates concentric (inset) fill paths for a closed polygon.
     """
@@ -176,27 +176,22 @@ def generate_concentric_fill(points, spacing):
 
     all_fill_paths = []
 
-    # Start the first inset inside the boundary
-    current_geom = poly.buffer(-spacing)
+    # Apply simplification to the initial inset
+    current_geom = poly.buffer(-spacing).simplify(simplify_tolerance, preserve_topology=False)
 
     while not current_geom.is_empty and current_geom.area > 0:
-        # Buffer can sometimes split a polygon into multiple islands (MultiPolygon)
-        # Handle both standard Polygons and MultiPolygons
         polygons = [
             current_geom
         ] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
 
         for p in polygons:
-            # Extract the outer boundary of the inset shape
             if p.exterior:
                 all_fill_paths.append(list(p.exterior.coords))
-
-            # If the shape has holes, extract their boundaries as well
             for interior in p.interiors:
                 all_fill_paths.append(list(interior.coords))
 
-        # Shrink the geometry again for the next loop iteration
-        current_geom = current_geom.buffer(-spacing)
+        # Apply simplification to subsequent insets
+        current_geom = current_geom.buffer(-spacing).simplify(simplify_tolerance, preserve_topology=False)
 
     return all_fill_paths
 
