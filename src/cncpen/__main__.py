@@ -30,7 +30,7 @@ class PenTool():
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.tool_off()
+        self.tool_off(clearance=True)
         self._build_postamble()
         self.g.flush()
 
@@ -46,8 +46,8 @@ class PenTool():
         self.g.write("G17 G90")
         self.g.write("M2")
 
-    def move_to(self, x, y):
-        self.tool_off()  # Safely ensure we are at clearance_z
+    def move_to(self, x, y, clearance=False):
+        self.tool_off(clearance=clearance)  # Safely ensure we are at the proper height
         self.g.rapid(x=x, y=y)
 
     def tool_on(self):
@@ -56,22 +56,29 @@ class PenTool():
             self.g.move(z=self.config.down_z)
             self.current_z = self.config.down_z
 
-    def tool_off(self):
-        # NOTE: Rapid lift to clearance_z to move pen tip away from stock.
-        # Only write if not already at clearance.
-        if self.current_z != self.config.clearance_z:
-            self.g.rapid(z=self.config.clearance_z)
-            self.current_z = self.config.clearance_z
+    def tool_off(self, clearance=False):
+        # Determine our target height based on the move type
+        target_z = self.config.clearance_z if clearance else self.config.rapid_z
+        
+        # Only lift if we are currently below the target height. 
+        # (e.g., if we are already at 5.0 clearance, don't drop down to 1.0 rapid)
+        if self.current_z is None or self.current_z < target_z:
+            self.g.rapid(z=target_z)
+            self.current_z = target_z
 
-    def draw_path(self, points):
+    def draw_path(self, points, clearance=False):
         """Draws a series of points."""
         if not points:
             return
-        self.move_to(*points[0])
+        # Move to the start of the path using the requested clearance height
+        self.move_to(*points[0], clearance=clearance)
         self.tool_on()
         for x, y in points[1:]:
             self.g.move(x=x, y=y, f=self.config.feed_rate)
-        self.tool_off()
+        
+        # Always end the path by lifting to rapid_z. 
+        # If the NEXT path requires clearance, it will handle the extra lift.
+        self.tool_off(clearance=False)
 
 
 def main():
@@ -144,7 +151,8 @@ def main():
     with PenTool(config, output_filename=args.output) as pen:
         for pts in paths_to_draw:
             # 1. Draw the outer boundary / standard lines
-            pen.draw_path(pts)
+            # Pass clearance=True to safely hop over screws/clamps to the new entity
+            pen.draw_path(pts, clearance=True)
 
             # 2. Draw the infill if enabled, and if the path is closed
             if args.fill and len(pts) > 2:
@@ -173,7 +181,9 @@ def main():
                                                           angle=args.angle)
 
                     for f_pts in fill_paths:
-                        pen.draw_path(f_pts)
+                        # For fills, clearance is False. The pen will just hop 
+                        # between fill lines at rapid_z.
+                        pen.draw_path(f_pts, clearance=False)
 
     print(f"G-code successfully saved to {args.output}")
 
