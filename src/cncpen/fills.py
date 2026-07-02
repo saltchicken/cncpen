@@ -1,6 +1,7 @@
+import math
+import random
 from shapely import affinity
-from shapely.geometry import LineString
-from shapely.geometry import Polygon
+from shapely.geometry import LineString, Polygon, Point
 
 
 def generate_zigzag_fill(points, spacing, angle=0.0):
@@ -198,3 +199,81 @@ def generate_concentric_fill(points, spacing):
         current_geom = current_geom.buffer(-spacing)
 
     return all_fill_paths
+
+def generate_lichtenberg_fill(points, spacing, nodes_count=1000):
+    """
+    Generates a Lichtenberg-style (branching fractal) fill using an RRT
+    (Rapidly-exploring Random Tree) algorithm confined to the polygon.
+    """
+    if len(points) < 4:
+        return []
+
+    poly = Polygon(points)
+
+    if not poly.is_valid or poly.area == 0:
+        poly = poly.buffer(0)
+        if poly.area == 0:
+            return []
+
+    minx, miny, maxx, maxy = poly.bounds
+
+    # 1. Find a valid starting point for the root (try centroid, or random fallback)
+    root = poly.centroid
+    if not poly.contains(root):
+        for _ in range(100):
+            p = Point(random.uniform(minx, maxx), random.uniform(miny, maxy))
+            if poly.contains(p):
+                root = p
+                break
+
+    nodes = [(root.x, root.y)]
+    adj = {0: []}  # Adjacency list to build the tree
+
+    # 2. Grow the tree
+    for _ in range(nodes_count):
+        rx, ry = random.uniform(minx, maxx), random.uniform(miny, maxy)
+
+        # Find the nearest existing node
+        nearest_idx = 0
+        min_dist_sq = float('inf')
+        for i, (nx, ny) in enumerate(nodes):
+            dist_sq = (rx - nx)**2 + (ry - ny)**2
+            if dist_sq < min_dist_sq:
+                min_dist_sq = dist_sq
+                nearest_idx = i
+
+        nx, ny = nodes[nearest_idx]
+        dist = math.sqrt(min_dist_sq)
+
+        if dist == 0:
+            continue
+
+        # Step towards the random point by `spacing` distance
+        step = min(spacing, dist)
+        new_x = nx + (rx - nx) * (step / dist)
+        new_y = ny + (ry - ny) * (step / dist)
+
+        # Check if the new segment is entirely inside the polygon
+        segment = LineString([(nx, ny), (new_x, new_y)])
+        if poly.contains(segment):
+            new_idx = len(nodes)
+            nodes.append((new_x, new_y))
+            adj[nearest_idx].append(new_idx)
+            adj[new_idx] = []
+
+    # 3. Extract continuous paths using DFS to minimize CNC pen lifts
+    def build_paths(node_idx):
+        children = adj[node_idx]
+        if not children:
+            return [[nodes[node_idx]]]
+
+        branch_paths = []
+        for child_idx in children:
+            child_paths = build_paths(child_idx)
+            # Prepend the parent node to the main branch path to connect them
+            child_paths[0].insert(0, nodes[node_idx])
+            branch_paths.extend(child_paths)
+            
+        return branch_paths
+
+    return build_paths(0)

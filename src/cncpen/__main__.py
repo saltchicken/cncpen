@@ -94,7 +94,7 @@ def main():
                         help="Enable infill for closed shapes")
     parser.add_argument(
         "--pattern",
-        choices=["zigzag", "sine", "concentric"],
+        choices=["zigzag", "sine", "concentric", "lichtenberg"],
         default="zigzag",
         help="Fill pattern to use if --fill is enabled (default: zigzag)")
     parser.add_argument("--spacing",
@@ -115,6 +115,9 @@ def main():
         type=float,
         default=5.0,
         help="Wavelength for the sine wave pattern (default: 5.0)")
+
+    parser.add_argument("--nodes", type=int, default=1500,
+                        help="Number of branches/nodes for Lichtenberg fill (default: 1500)")
 
     args = parser.parse_args()
 
@@ -155,6 +158,10 @@ def main():
                     elif args.pattern == "concentric":
                         fill_paths = generate_concentric_fill(
                             pts, spacing=args.spacing)
+                    elif args.pattern == "lichtenberg":
+                        # Dispatch the new fill here
+                        fill_paths = generate_lichtenberg_fill(
+                            pts, spacing=args.spacing, nodes_count=args.nodes)
                     else:
                         fill_paths = generate_zigzag_fill(pts,
                                                           spacing=args.spacing,
