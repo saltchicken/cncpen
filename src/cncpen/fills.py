@@ -69,6 +69,9 @@ def generate_zigzag_fill(points, spacing, angle=0.0):
             left_to_right = not left_to_right
             y += spacing
 
+    if all_fill_paths:
+        all_fill_paths.pop()
+
     return all_fill_paths
 
 
