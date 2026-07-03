@@ -1,153 +1,35 @@
-import argparse
-from dataclasses import dataclass
-from functools import reduce
 import math
 import operator
-import os
 import sys
+from functools import reduce
+from typing import List
 
-from gscrib import GCodeBuilder
 from shapely.geometry import Polygon
 
-from .fills import FILL_REGISTRY
-from .fills import load_plugins
-from .utils import extract_dxf_paths
-from .utils import optimize_paths_nearest_neighbor
+from .cli import parse_args
+from .fills import FILL_REGISTRY, load_plugins
+from .machine import PenConfig, PenTool
+from .utils import DXFReadError, extract_dxf_paths, optimize_paths_nearest_neighbor
 
 
-@dataclass
-class PenConfig:
-    clearance_z: float = 5.0
-    rapid_z: float = 1.0
-    feed_rate: float = 400.0
-    down_z: float = -1.0
-
-
-class PenTool:
-
-    def __init__(self, config: PenConfig, output_filename="output.nc"):
-        self.g = GCodeBuilder(output=output_filename)
-        self.config = config
-        self.current_z = None  # Track the current Z height
-
-    def __enter__(self):
-        self._build_preamble()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.tool_off(clearance=True)
-        self._build_postamble()
-        self.g.flush()
-
-    def _build_preamble(self):
-        self.g.set_plane('xy')
-        self.g.set_distance_mode('absolute')
-        self.g.set_length_units('mm')
-        self.g.write("G54")  # Work Coordinate System Home
-
-        # Declare the modal feed rate before any G1 moves occur
-        self.g.write(f"F{self.config.feed_rate}")
-
-    def _build_postamble(self):
-        """Writes the required final G-code commands."""
-        self.g.write("M5")
-        self.g.write("G17 G90")
-        self.g.write("M2")
-
-    def move_to(self, x, y, clearance=False):
-        self.tool_off(
-            clearance=clearance)  # Safely ensure we are at the proper height
-        self.g.rapid(x=x, y=y)
-
-    def tool_on(self):
-        # NOTE: Z axis applies pressure. Only write if not already down.
-        if self.current_z != self.config.down_z:
-            self.g.move(z=self.config.down_z)
-            self.current_z = self.config.down_z
-
-    def tool_off(self, clearance=False):
-        # Determine our target height based on the move type
-        target_z = self.config.clearance_z if clearance else self.config.rapid_z
-
-        # Only lift if we are currently below the target height.
-        if self.current_z is None or self.current_z < target_z:
-            self.g.rapid(z=target_z)
-            self.current_z = target_z
-
-    def draw_path(self, points, clearance=False):
-        """Draws a series of points."""
-        if not points:
-            return
-        # Move to the start of the path using the requested clearance height
-        self.move_to(*points[0], clearance=clearance)
-        self.tool_on()
-        for x, y in points[1:]:
-            self.g.move(x=x, y=y, f=self.config.feed_rate)
-
-        # Always end the path by lifting to rapid_z.
-        self.tool_off(clearance=False)
-
-
-def main():
-    # 1. Load all dynamic plugins to populate the registry FIRST
+def main() -> None:
+    # 1. Load all dynamic plugins to populate the registry
     load_plugins()
 
-    parser = argparse.ArgumentParser(
-        description="Generate CNC G-code from a DXF file using a pen tool.")
-    
-    # Global arguments
-    parser.add_argument("dxf_file", help="Path to the input DXF file")
-    parser.add_argument(
-        "-o",
-        "--output",
-        default=None,
-        help="Output G-code filename (default: matches input filename with .nc extension)"
-    )
-    parser.add_argument("--feed",
-                        type=float,
-                        default=400.0,
-                        help="Drawing feed rate (default: 400.0)")
-    parser.add_argument(
-        "--simplify",
-        type=float,
-        default=0.0,
-        help="Simplification tolerance for drawing paths (default: 0.0)"
-    )
-    parser.add_argument(
-        "--optimize",
-        action="store_true",
-        help="Optimize drawing order using nearest neighbor to minimize travel time")
-
-    # Subparsers for fill patterns
-    subparsers = parser.add_subparsers(
-        dest="pattern", 
-        help="Optional: Specify a fill pattern to enable infill (e.g., 'zigzag', 'sine'). If omitted, only outlines are drawn."
-    )
-
-    for name, plugin_class in FILL_REGISTRY.items():
-        pattern_parser = subparsers.add_parser(name, help=f"Use the {name} fill pattern.")
-        # Common arguments applied to all fills
-        pattern_parser.add_argument("--spacing",
-                            type=float,
-                            default=1.0,
-                            help="Distance between fill lines (default: 1.0)")
-        pattern_parser.add_argument("--angle",
-                            type=float,
-                            default=0.0,
-                            help="Angle of the fill in degrees (default: 0.0)")
-        # Plugin-specific arguments
-        plugin_class.setup_cli(pattern_parser)
-
-    args = parser.parse_args()
-
-    if args.output is None:
-        base_name = os.path.splitext(args.dxf_file)[0]
-        args.output = f"{base_name}.nc"
+    # 2. Parse arguments via isolated CLI module
+    args = parse_args()
 
     print(f"Reading geometry from {args.dxf_file}...")
 
-    paths_to_draw = extract_dxf_paths(args.dxf_file,
-                                      simplify_tolerance=args.simplify)
+    # 3. Handle geometry extraction with the new custom exception
+    try:
+        paths_to_draw = extract_dxf_paths(
+            args.dxf_file,
+            simplify_tolerance=args.simplify
+        )
+    except DXFReadError as e:
+        print(f"Fatal Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     if args.optimize:
         print("Optimizing outline paths...")
@@ -160,15 +42,16 @@ def main():
         sys.exit(0)
 
     config = PenConfig(feed_rate=args.feed)
+    closed_polys: List[Polygon] = []
 
+    # 4. Orchestrate the G-code generation
     with PenTool(config, output_filename=args.output) as pen:
-        closed_polys = []
-
-        # 1. Draw all outlines and collect closed shapes
+        
+        # Draw all outlines and collect closed shapes
         for pts in paths_to_draw:
             pen.draw_path(pts, clearance=True)
 
-            # 2. Collect closed shapes if a fill pattern was requested
+            # Collect closed shapes if a fill pattern was requested
             if args.pattern and len(pts) > 2:
                 dx = pts[0][0] - pts[-1][0]
                 dy = pts[0][1] - pts[-1][1]
@@ -183,25 +66,27 @@ def main():
                         if poly.area > 0:
                             closed_polys.append(poly)
 
-        # 3. Process Fills using the Even-Odd Rule
+        # Process Fills using the Even-Odd Rule
         if args.pattern and closed_polys:
             # XOR all closed paths to automatically punch out holes
             combined_geom = reduce(operator.xor, closed_polys)
 
             fill_class = FILL_REGISTRY.get(args.pattern)
-            filler = fill_class()
-            
-            # Execute the generation method, passing parsed args automatically
-            fill_paths = filler.generate(combined_geom, **vars(args))
+            if fill_class:
+                filler = fill_class()
+                
+                # Execute the generation method, passing parsed args automatically
+                fill_paths = filler.generate(combined_geom, **vars(args))
 
-            if args.optimize:
-                print(f"Optimizing {args.pattern} fill paths...")
-                last_position = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
-                fill_paths = optimize_paths_nearest_neighbor(
-                    fill_paths, start_pt=last_position)
+                if args.optimize:
+                    print(f"Optimizing {args.pattern} fill paths...")
+                    last_position = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+                    fill_paths = optimize_paths_nearest_neighbor(
+                        fill_paths, start_pt=last_position
+                    )
 
-            for f_pts in fill_paths:
-                pen.draw_path(f_pts, clearance=False)
+                for f_pts in fill_paths:
+                    pen.draw_path(f_pts, clearance=False)
 
     print(f"G-code successfully saved to {args.output}")
 
