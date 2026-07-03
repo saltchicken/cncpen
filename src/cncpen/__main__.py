@@ -15,7 +15,7 @@ from .fills import (
     generate_concentric_fill, 
     generate_lichtenberg_fill
 )
-from .utils import extract_dxf_paths
+from .utils import extract_dxf_paths, optimize_paths_nearest_neighbor
 
 
 @dataclass
@@ -139,6 +139,10 @@ def main():
                         default=0.2,
                         help="Simplification tolerance for fills. Higher value = fewer G-code lines (default: 0.2)")
 
+    parser.add_argument("--optimize",
+                        action="store_true",
+                        help="Optimize drawing order using nearest neighbor to minimize travel time")
+
     args = parser.parse_args()
 
     if args.output is None:
@@ -148,6 +152,11 @@ def main():
     print(f"Reading geometry from {args.dxf_file}...")
 
     paths_to_draw = extract_dxf_paths(args.dxf_file, simplify_tolerance=args.simplify)
+
+    if args.optimize:
+        print("Optimizing outline paths...")
+        paths_to_draw = optimize_paths_nearest_neighbor(paths_to_draw)
+
     print(f"Extracted {len(paths_to_draw)} draw operations.")
 
     if not paths_to_draw:
@@ -201,6 +210,12 @@ def main():
             else:
                 fill_paths = generate_zigzag_fill(
                     combined_geom, spacing=args.spacing, angle=args.angle)
+
+            if args.optimize:
+                print("Optimizing fill paths...")
+                # Start optimizing from the pen's last known location to minimize the jump to the first fill
+                last_position = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+                fill_paths = optimize_paths_nearest_neighbor(fill_paths, start_pt=last_position)
 
             for f_pts in fill_paths:
                 # For fills, clearance is False. The pen will just hop 

@@ -1,4 +1,5 @@
 import ezdxf
+import math
 from ezdxf.path import make_path
 import sys
 from shapely.geometry import LineString, MultiLineString
@@ -56,3 +57,54 @@ def extract_dxf_paths(filepath, flatten_distance=0.1, simplify_tolerance=0.0):
             paths.append(list(line.coords))
 
     return paths
+
+def optimize_paths_nearest_neighbor(paths, start_pt=(0.0, 0.0)):
+    """
+    Optimizes drawing order using a greedy nearest neighbor algorithm to
+    minimize travel distance. Reverses paths if the end point is closer.
+    """
+    if not paths:
+        return []
+
+    unvisited = list(paths)
+    optimized = []
+    current_pt = start_pt
+
+    def dist(p1, p2):
+        return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+    while unvisited:
+        best_idx = -1
+        best_dist = float('inf')
+        reverse_best = False
+
+        for i, path in enumerate(unvisited):
+            if not path:
+                continue
+
+            # Check distance to start of path
+            d_start = dist(current_pt, path[0])
+            if d_start < best_dist:
+                best_dist = d_start
+                best_idx = i
+                reverse_best = False
+
+            # Check distance to end of path (allows drawing backwards)
+            d_end = dist(current_pt, path[-1])
+            if d_end < best_dist:
+                best_dist = d_end
+                best_idx = i
+                reverse_best = True
+
+        if best_idx == -1:
+            break
+
+        chosen_path = unvisited.pop(best_idx)
+        if reverse_best:
+            chosen_path = list(reversed(chosen_path))
+
+        optimized.append(chosen_path)
+        # Update our current position to the end of the drawn path
+        current_pt = chosen_path[-1]
+
+    return optimized
