@@ -43,6 +43,10 @@ class PenTool():
         self.g.set_length_units('mm')
         self.g.write("G54")  # Work Coordinate System Home
 
+        # Declare the modal feed rate before any G1 moves occur
+        self.g.write(f"F{self.config.feed_rate}")
+
+
     def _build_postamble(self):
         """Writes the required final G-code commands."""
         self.g.write("M5")
