@@ -8,6 +8,7 @@ from shapely import affinity
 from shapely.geometry import LineString
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
+from shapely.strtree import STRtree
 
 # --- REGISTRY SYSTEM ---
 FILL_REGISTRY = {}
@@ -80,7 +81,11 @@ def _apply_pattern_to_shape(shape, angle, pattern_generator, **kwargs):
     for p in polygons:
         raw_lines = pattern_generator(p, **kwargs)
 
-        for line in raw_lines:
+        tree = STRtree(raw_lines)
+        overlapping_lines = tree.query(p, predicate="intersects")
+
+        for line_idx in overlapping_lines:
+            line = raw_lines[line_idx]
             intersection = p.intersection(line)
             clipped_lines = _extract_lines(intersection)
 
