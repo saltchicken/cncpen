@@ -21,7 +21,6 @@ class PenTool:
     def __enter__(self) -> "PenTool":
         self._build_preamble()
         # Initialize Z-height state explicitly after preamble
-        self.current_z = self.config.clearance_z
         return self
 
     def __exit__(self, exc_type: type, exc_val: Exception, exc_tb: type) -> None:
@@ -37,6 +36,11 @@ class PenTool:
 
         # Declare the modal feed rate before any G1 moves occur
         self.g.write(f"F{self.config.feed_rate}")
+
+        # Move to clearance height immediately
+        self.g.rapid(z=self.config.clearance_z)
+        self.current_z = self.config.clearance_z
+
 
     def _build_postamble(self) -> None:
         """Writes the required final G-code commands."""
