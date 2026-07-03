@@ -353,3 +353,83 @@ def generate_sacred_geometry_fill(shape, spacing, angle=0.0):
                 all_fill_paths.append(list(line.coords))
 
     return all_fill_paths
+
+def generate_hilbert_fill(shape, spacing, angle=0.0):
+    """
+    Generates a highly intricate Hilbert space-filling curve.
+    Dynamically scales the fractal depth based on the bounding box and spacing.
+    """
+    poly = _ensure_geom(shape)
+    if poly.is_empty or poly.area == 0:
+        return []
+
+    centroid = poly.centroid
+
+    if angle != 0.0:
+        poly = affinity.rotate(poly, -angle, origin=centroid)
+
+    polygons = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
+    all_fill_paths = []
+
+    # Prevent a 0 spacing to avoid infinite scaling loops
+    safe_spacing = max(spacing, 0.1)
+
+    for p in polygons:
+        minx, miny, maxx, maxy = p.bounds
+        width = maxx - minx
+        height = maxy - miny
+        size = max(width, height)
+
+        # Calculate the required recursion depth (order) of the Hilbert curve
+        # We want the segment lengths to roughly match the requested spacing.
+        if size > safe_spacing:
+            order = int(math.ceil(math.log2(size / safe_spacing)))
+        else:
+            order = 1
+            
+        # Cap the order to 8 to prevent memory exhaustion on massive shapes 
+        # (Order 8 = 65,536 coordinates per polygon)
+        order = min(order, 8)
+
+        def hilbert(x0, y0, xi, xj, yi, yj, n):
+            """Recursive generator for the Hilbert curve coordinates."""
+            if n == 0:
+                return [(x0 + (xi + yi) / 2.0, y0 + (xj + yj) / 2.0)]
+            
+            return (
+                hilbert(x0, y0, yi / 2, yj / 2, xi / 2, xj / 2, n - 1) +
+                hilbert(x0 + xi / 2, y0 + xj / 2, xi / 2, xj / 2, yi / 2, yj / 2, n - 1) +
+                hilbert(x0 + xi / 2 + yi / 2, y0 + xj / 2 + yj / 2, xi / 2, xj / 2, yi / 2, yj / 2, n - 1) +
+                hilbert(x0 + xi / 2 + yi, y0 + xj / 2 + yj, -yi / 2, -yj / 2, -xi / 2, -xj / 2, n - 1)
+            )
+
+        # Generate the raw curve points covering the bounding box
+        pts = hilbert(minx, miny, size, 0.0, 0.0, size, order)
+
+        if len(pts) < 2:
+            continue
+
+        # Convert to a Shapely geometry and intersect with the boundary
+        curve = LineString(pts)
+        intersection = p.intersection(curve)
+
+        if intersection.is_empty:
+            continue
+
+        lines = []
+        if intersection.geom_type == 'LineString':
+            lines.append(intersection)
+        elif intersection.geom_type == 'MultiLineString':
+            lines.extend(list(intersection.geoms))
+        elif intersection.geom_type == 'GeometryCollection':
+            for geom in intersection.geoms:
+                if geom.geom_type == 'LineString':
+                    lines.append(geom)
+
+        # Re-apply any requested rotation and save coordinates
+        for line in lines:
+            if angle != 0.0:
+                line = affinity.rotate(line, angle, origin=centroid)
+            all_fill_paths.append(list(line.coords))
+
+    return all_fill_paths
