@@ -146,6 +146,15 @@ def main():
                         action="store_true",
                         help="Optimize drawing order using nearest neighbor to minimize travel time")
 
+    # Chaotic Affine Fill Parameters
+    parser.add_argument("--depth", type=int, default=4,
+                        help="Recursion depth for fractal fills. Higher = more detail (default: 4)")
+    parser.add_argument("--chaos-freq", type=float, default=0.15,
+                        help="Frequency of the spatial warp for chaotic fill (default: 0.15)")
+    parser.add_argument("--chaos-amp", type=float, default=0.8,
+                        help="Amplitude/intensity of the spatial warp for chaotic fill (default: 0.8)")
+
+
     args = parser.parse_args()
 
     if args.output is None:
@@ -218,7 +227,12 @@ def main():
                         combined_geom, spacing=args.spacing, angle=args.angle)
             elif args.pattern == "chaotic":
                     fill_paths = generate_chaotic_affine_fill(
-                        combined_geom, spacing=args.spacing, angle=args.angle)
+                        combined_geom, 
+                        spacing=args.spacing, 
+                        angle=args.angle,
+                        depth=args.depth,
+                        chaos_freq=args.chaos_freq,
+                        chaos_amp=args.chaos_amp)
             else:
                 fill_paths = generate_zigzag_fill(
                     combined_geom, spacing=args.spacing, angle=args.angle)
