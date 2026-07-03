@@ -1,6 +1,8 @@
 import importlib
 from pathlib import Path
 import sys
+from typing import Protocol, List, Any
+import argparse
 
 from shapely import affinity
 from shapely.geometry import LineString
@@ -11,13 +13,23 @@ from shapely.geometry.base import BaseGeometry
 FILL_REGISTRY = {}
 
 
+class FillPattern(Protocol):
+    """Protocol defining the interface for all fill plugins."""
+    @classmethod
+    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
+        """Register plugin-specific command line arguments."""
+        ...
+
+    def generate(self, shape: BaseGeometry, **kwargs: Any) -> List[List[tuple[float, float]]]:
+        """Generate a list of toolpaths (lists of coordinates) for the given shape."""
+        ...
+
+
 def register_fill(name):
-    """Decorator to automatically register a fill pattern."""
-
-    def decorator(func):
-        FILL_REGISTRY[name] = func
-        return func
-
+    """Decorator to automatically register a fill pattern class."""
+    def decorator(cls):
+        FILL_REGISTRY[name] = cls
+        return cls
     return decorator
 
 
@@ -81,56 +93,63 @@ def _apply_pattern_to_shape(shape, angle, pattern_generator, **kwargs):
 
 
 @register_fill("zigzag")
-def generate_zigzag_fill(shape, spacing, angle=0.0, **kwargs):
+class ZigZagFill:
     """Generates back-and-forth (zig-zag) fill paths for a closed polygon."""
+    
+    @classmethod
+    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
+        pass  # Relies on the default --spacing and --angle
 
-    def zigzag_generator(p, spacing):
-        minx, miny, maxx, maxy = p.bounds
-        y = miny + spacing
-        lines = []
-        left_to_right = True
+    def generate(self, shape: BaseGeometry, spacing: float, angle: float = 0.0, **kwargs: Any) -> List[List[tuple[float, float]]]:
+        def zigzag_generator(p, spacing):
+            minx, miny, maxx, maxy = p.bounds
+            y = miny + spacing
+            lines = []
+            left_to_right = True
 
-        while y <= maxy:
-            x1, x2 = (minx - 1, maxx + 1) if left_to_right else (maxx + 1,
-                                                                 minx - 1)
-            lines.append(LineString([(x1, y), (x2, y)]))
-            y += spacing
-            left_to_right = not left_to_right
+            while y <= maxy:
+                x1, x2 = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
+                lines.append(LineString([(x1, y), (x2, y)]))
+                y += spacing
+                left_to_right = not left_to_right
 
-        return lines
+            return lines
 
-    return _apply_pattern_to_shape(shape,
-                                   angle,
-                                   zigzag_generator,
-                                   spacing=spacing)
+        return _apply_pattern_to_shape(shape, angle, zigzag_generator, spacing=spacing)
 
 
 @register_fill("concentric")
-def generate_concentric_fill(shape, spacing, simplify=0.2, **kwargs):
+class ConcentricFill:
     """Generates concentric (inset) fill paths for a closed polygon."""
-    poly = _ensure_geom(shape)
-    if poly.is_empty or poly.area == 0:
-        return []
+    
+    @classmethod
+    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--ring-simplify", type=float, default=0.2, 
+                            help="Simplification tolerance specific to inner concentric rings (default: 0.2)")
 
-    all_fill_paths = []
-    current_geom = poly.buffer(-spacing).simplify(simplify,
-                                                  preserve_topology=False)
+    def generate(self, shape: BaseGeometry, spacing: float, ring_simplify: float = 0.2, **kwargs: Any) -> List[List[tuple[float, float]]]:
+        poly = _ensure_geom(shape)
+        if poly.is_empty or poly.area == 0:
+            return []
 
-    while not current_geom.is_empty and current_geom.area > 0:
-        polygons = [
-            current_geom
-        ] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
+        all_fill_paths = []
+        current_geom = poly.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
 
-        for p in polygons:
-            if p.exterior:
-                all_fill_paths.append(list(p.exterior.coords))
-            for interior in p.interiors:
-                all_fill_paths.append(list(interior.coords))
+        while not current_geom.is_empty and current_geom.area > 0:
+            polygons = [
+                current_geom
+            ] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
 
-        current_geom = current_geom.buffer(-spacing).simplify(
-            simplify, preserve_topology=False)
+            for p in polygons:
+                if p.exterior:
+                    all_fill_paths.append(list(p.exterior.coords))
+                for interior in p.interiors:
+                    all_fill_paths.append(list(interior.coords))
 
-    return all_fill_paths
+            current_geom = current_geom.buffer(-spacing).simplify(
+                ring_simplify, preserve_topology=False)
+
+        return all_fill_paths
 
 
 def load_plugins():

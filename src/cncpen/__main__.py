@@ -23,7 +23,7 @@ class PenConfig:
     down_z: float = -1.0
 
 
-class PenTool():
+class PenTool:
 
     def __init__(self, config: PenConfig, output_filename="output.nc"):
         self.g = GCodeBuilder(output=output_filename)
@@ -70,7 +70,6 @@ class PenTool():
         target_z = self.config.clearance_z if clearance else self.config.rapid_z
 
         # Only lift if we are currently below the target height.
-        # (e.g., if we are already at 5.0 clearance, don't drop down to 1.0 rapid)
         if self.current_z is None or self.current_z < target_z:
             self.g.rapid(z=target_z)
             self.current_z = target_z
@@ -86,7 +85,6 @@ class PenTool():
             self.g.move(x=x, y=y, f=self.config.feed_rate)
 
         # Always end the path by lifting to rapid_z.
-        # If the NEXT path requires clearance, it will handle the extra lift.
         self.tool_off(clearance=False)
 
 
@@ -96,86 +94,49 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="Generate CNC G-code from a DXF file using a pen tool.")
+    
+    # Global arguments
     parser.add_argument("dxf_file", help="Path to the input DXF file")
     parser.add_argument(
         "-o",
         "--output",
         default=None,
-        help=
-        "Output G-code filename (default: matches input filename with .nc extension)"
+        help="Output G-code filename (default: matches input filename with .nc extension)"
     )
     parser.add_argument("--feed",
                         type=float,
                         default=400.0,
                         help="Drawing feed rate (default: 400.0)")
-    parser.add_argument("--fill",
-                        action="store_true",
-                        help="Enable infill for closed shapes")
-
-    # NEW: Dynamically pull choices from the registry
-    parser.add_argument(
-        "--pattern",
-        choices=list(FILL_REGISTRY.keys()),
-        default="zigzag",
-        help=
-        f"Fill pattern to use if --fill is enabled. Options: {', '.join(FILL_REGISTRY.keys())}"
-    )
-
-    parser.add_argument("--spacing",
-                        type=float,
-                        default=1.0,
-                        help="Distance between fill lines (default: 1.0)")
-    parser.add_argument("--angle",
-                        type=float,
-                        default=0.0,
-                        help="Angle of the fill in degrees (default: 0.0)")
-    parser.add_argument(
-        "--amplitude",
-        type=float,
-        default=1.0,
-        help="Amplitude for the sine wave pattern (default: 1.0)")
-    parser.add_argument(
-        "--wavelength",
-        type=float,
-        default=5.0,
-        help="Wavelength for the sine wave pattern (default: 5.0)")
-    parser.add_argument(
-        "--nodes",
-        type=int,
-        default=1500,
-        help="Number of branches/nodes for Lichtenberg fill (default: 1500)")
     parser.add_argument(
         "--simplify",
         type=float,
         default=0.0,
-        help=
-        "Simplification tolerance for fills. Higher value = fewer G-code lines (default: 0.0)"
+        help="Simplification tolerance for drawing paths (default: 0.0)"
     )
     parser.add_argument(
         "--optimize",
         action="store_true",
-        help=
-        "Optimize drawing order using nearest neighbor to minimize travel time")
+        help="Optimize drawing order using nearest neighbor to minimize travel time")
 
-    # Chaotic Affine Fill Parameters
-    parser.add_argument(
-        "--depth",
-        type=int,
-        default=4,
-        help=
-        "Recursion depth for fractal fills. Higher = more detail (default: 4)")
-    parser.add_argument(
-        "--chaos-freq",
-        type=float,
-        default=0.15,
-        help="Frequency of the spatial warp for chaotic fill (default: 0.15)")
-    parser.add_argument(
-        "--chaos-amp",
-        type=float,
-        default=0.8,
-        help=
-        "Amplitude/intensity of the spatial warp for chaotic fill (default: 0.8)"
+    # Subparsers for fill patterns
+    subparsers = parser.add_subparsers(
+        dest="pattern", 
+        help="Optional: Specify a fill pattern to enable infill (e.g., 'zigzag', 'sine'). If omitted, only outlines are drawn."
     )
+
+    for name, plugin_class in FILL_REGISTRY.items():
+        pattern_parser = subparsers.add_parser(name, help=f"Use the {name} fill pattern.")
+        # Common arguments applied to all fills
+        pattern_parser.add_argument("--spacing",
+                            type=float,
+                            default=1.0,
+                            help="Distance between fill lines (default: 1.0)")
+        pattern_parser.add_argument("--angle",
+                            type=float,
+                            default=0.0,
+                            help="Angle of the fill in degrees (default: 0.0)")
+        # Plugin-specific arguments
+        plugin_class.setup_cli(pattern_parser)
 
     args = parser.parse_args()
 
@@ -207,8 +168,8 @@ def main():
         for pts in paths_to_draw:
             pen.draw_path(pts, clearance=True)
 
-            # 2. Collect closed shapes if fill is enabled
-            if args.fill and len(pts) > 2:
+            # 2. Collect closed shapes if a fill pattern was requested
+            if args.pattern and len(pts) > 2:
                 dx = pts[0][0] - pts[-1][0]
                 dy = pts[0][1] - pts[-1][1]
 
@@ -218,30 +179,24 @@ def main():
                     if poly.is_valid and poly.area > 0:
                         closed_polys.append(poly)
                     else:
-                        poly = poly.buffer(
-                            0)  # Attempt to fix self-intersections
+                        poly = poly.buffer(0)  # Attempt to fix self-intersections
                         if poly.area > 0:
                             closed_polys.append(poly)
 
         # 3. Process Fills using the Even-Odd Rule
-        if args.fill and closed_polys:
+        if args.pattern and closed_polys:
             # XOR all closed paths to automatically punch out holes
             combined_geom = reduce(operator.xor, closed_polys)
 
-            # NEW: Dynamic Function Lookup
-            fill_func = FILL_REGISTRY.get(args.pattern)
-            if not fill_func:
-                print(f"Error: Pattern '{args.pattern}' not found.")
-                sys.exit(1)
-
-            # Execute the function, passing ALL argparse arguments automatically
-            fill_paths = fill_func(combined_geom, **vars(args))
+            fill_class = FILL_REGISTRY.get(args.pattern)
+            filler = fill_class()
+            
+            # Execute the generation method, passing parsed args automatically
+            fill_paths = filler.generate(combined_geom, **vars(args))
 
             if args.optimize:
-                print("Optimizing fill paths...")
-                # Start optimizing from the pen's last known location
-                last_position = (
-                    0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+                print(f"Optimizing {args.pattern} fill paths...")
+                last_position = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
                 fill_paths = optimize_paths_nearest_neighbor(
                     fill_paths, start_pt=last_position)
 
