@@ -7,7 +7,7 @@ from typing import List
 from shapely.geometry import Polygon
 
 from .cli import parse_args
-from .fills import FILL_REGISTRY, load_plugins
+from .fills import FILL_REGISTRY, load_plugins, generate_pipeline
 from .machine import PenConfig, PenTool
 from .utils import DXFReadError, extract_dxf_paths, optimize_paths_nearest_neighbor
 
@@ -75,8 +75,12 @@ def main() -> None:
             if fill_class:
                 filler = fill_class()
                 
-                # Execute the generation method, passing parsed args automatically
-                fill_paths = filler.generate(combined_geom, **vars(args))
+                # Delegate to the central pipeline
+                fill_paths = generate_pipeline(
+                    filler, 
+                    combined_geom, 
+                    **vars(args)
+                )
 
                 if args.optimize:
                     print(f"Optimizing {args.pattern} fill paths...")

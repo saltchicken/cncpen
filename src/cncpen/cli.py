@@ -1,6 +1,5 @@
 import argparse
 import os
-from typing import Any
 
 from .fills import FILL_REGISTRY
 
@@ -40,7 +39,7 @@ def parse_args() -> argparse.Namespace:
     # Subparsers for fill patterns
     subparsers = parser.add_subparsers(
         dest="pattern", 
-        help="Optional: Specify a fill pattern to enable infill (e.g., 'zigzag', 'sine'). If omitted, only outlines are drawn."
+        help="Optional: Specify a fill pattern to enable infill. If omitted, only outlines are drawn."
     )
 
     for name, plugin_class in FILL_REGISTRY.items():
@@ -58,6 +57,12 @@ def parse_args() -> argparse.Namespace:
             type=float,
             default=0.0,
             help="Angle of the fill in degrees (default: 0.0)"
+        )
+        pattern_parser.add_argument(
+            "--fisheye",
+            type=float,
+            default=0.0,
+            help="Apply radial distortion. Try -0.5 for a pinch, or 0.5 for a bulge. (default: 0.0)"
         )
         # Plugin-specific arguments
         plugin_class.setup_cli(pattern_parser)

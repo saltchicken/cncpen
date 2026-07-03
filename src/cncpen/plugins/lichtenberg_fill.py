@@ -3,11 +3,9 @@ import math
 import random
 from typing import List, Any
 
-from shapely.geometry import LineString
-from shapely.geometry import Point
+from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen.fills import _ensure_geom
 from cncpen.fills import register_fill
 
 
@@ -23,28 +21,14 @@ class LichtenbergFill:
         parser.add_argument("--nodes", type=int, default=1500,
                             help="Number of branches/nodes for Lichtenberg fill (default: 1500)")
 
-    def generate(self, shape: BaseGeometry, spacing: float, nodes: int = 1500, **kwargs: Any) -> List[List[tuple[float, float]]]:
-        poly = _ensure_geom(shape)
-        if poly.is_empty or poly.area == 0:
-            return []
-
-        if poly.geom_type in ('MultiPolygon', 'GeometryCollection'):
-            all_paths = []
-            total_area = poly.area
-            for geom in poly.geoms:
-                if geom.area > 0:
-                    island_nodes = max(10, int(nodes * (geom.area / total_area)))
-                    all_paths.extend(
-                        self.generate(geom, spacing, island_nodes, **kwargs))
-            return all_paths
-
-        minx, miny, maxx, maxy = poly.bounds
-
-        root = poly.centroid
-        if not poly.contains(root):
+    def generate(self, shape: BaseGeometry, spacing: float, nodes: int = 1500, **kwargs: Any) -> List[LineString]:
+        minx, miny, maxx, maxy = shape.bounds
+        root = shape.centroid
+        
+        if not shape.contains(root):
             for _ in range(100):
                 p = Point(random.uniform(minx, maxx), random.uniform(miny, maxy))
-                if poly.contains(p):
+                if shape.contains(p):
                     root = p
                     break
 
@@ -73,7 +57,7 @@ class LichtenbergFill:
             new_y = ny + (ry - ny) * (step / dist)
 
             segment = LineString([(nx, ny), (new_x, new_y)])
-            if poly.contains(segment):
+            if shape.contains(segment):
                 new_idx = len(nodes_list)
                 nodes_list.append((new_x, new_y))
                 adj[nearest_idx].append(new_idx)
@@ -92,4 +76,5 @@ class LichtenbergFill:
 
             return branch_paths
 
-        return build_paths(0)
+        raw_paths = build_paths(0)
+        return [LineString(p) for p in raw_paths if len(p) > 1]

@@ -6,8 +6,6 @@ from shapely import affinity
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen.fills import _ensure_geom
-from cncpen.fills import _extract_lines
 from cncpen.fills import register_fill
 
 
@@ -27,24 +25,15 @@ class ChaoticFill:
         parser.add_argument("--chaos-amp", type=float, default=0.8,
                             help="Amplitude/intensity of the spatial warp for chaotic fill (default: 0.8)")
 
-    def generate(self, shape: BaseGeometry, spacing: float, angle: float = 0.0, 
-                 depth: int = 4, chaos_freq: float = 0.15, chaos_amp: float = 0.8, 
-                 **kwargs: Any) -> List[List[tuple[float, float]]]:
+    def generate(self, shape: BaseGeometry, spacing: float, depth: int = 4, 
+                 chaos_freq: float = 0.15, chaos_amp: float = 0.8, **kwargs: Any) -> List[LineString]:
                      
-        poly = _ensure_geom(shape)
-        if poly.is_empty or poly.area == 0:
-            return []
-
-        centroid = poly.centroid
-        if angle != 0.0:
-            poly = affinity.rotate(poly, -angle, origin=centroid)
-
-        minx, miny, maxx, maxy = poly.bounds
-
+        minx, miny, maxx, maxy = shape.bounds
         coarse_spacing = max(spacing * 4.0, 1.0)
         base_lines = []
         y = miny - coarse_spacing
         left_to_right = True
+        
         while y <= maxy + coarse_spacing:
             x1, x2 = (minx - coarse_spacing, maxx + coarse_spacing) if left_to_right else (maxx + coarse_spacing, minx - coarse_spacing)
             base_lines.append(LineString([(x1, y), (x2, y)]))
@@ -102,18 +91,4 @@ class ChaoticFill:
                 segment_fractal = segment_fractal[1:]
             fractal_coords.extend(segment_fractal)
 
-        fractal_line = LineString(fractal_coords)
-
-        polygons = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
-        all_fill_paths = []
-
-        for p in polygons:
-            intersection = p.intersection(fractal_line)
-            clipped_lines = _extract_lines(intersection)
-
-            for line in clipped_lines:
-                if angle != 0.0:
-                    line = affinity.rotate(line, angle, origin=centroid)
-                all_fill_paths.append(list(line.coords))
-
-        return all_fill_paths
+        return [LineString(fractal_coords)]

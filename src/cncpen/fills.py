@@ -1,12 +1,12 @@
 import importlib
-from pathlib import Path
+import math
 import sys
-from typing import Protocol, List, Any
 import argparse
+from pathlib import Path
+from typing import Protocol, List, Any
 
 from shapely import affinity
-from shapely.geometry import LineString
-from shapely.geometry import Polygon
+from shapely.geometry import LineString, Polygon
 from shapely.geometry.base import BaseGeometry
 
 # --- REGISTRY SYSTEM ---
@@ -20,8 +20,8 @@ class FillPattern(Protocol):
         """Register plugin-specific command line arguments."""
         ...
 
-    def generate(self, shape: BaseGeometry, **kwargs: Any) -> List[List[tuple[float, float]]]:
-        """Generate a list of toolpaths (lists of coordinates) for the given shape."""
+    def generate(self, shape: BaseGeometry, **kwargs: Any) -> List[LineString]:
+        """Generate a list of raw, unclipped LineStrings mapping over the shape bounds."""
         ...
 
 
@@ -44,6 +44,7 @@ def _ensure_geom(shape):
 
     if not poly.is_valid or poly.area == 0:
         poly = poly.buffer(0)
+        
     return poly
 
 
@@ -60,30 +61,56 @@ def _extract_lines(geometry):
     return []
 
 
-def _apply_pattern_to_shape(shape, angle, pattern_generator, **kwargs):
+def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, **kwargs):
     """
-    Handles standard validation, rotation, and intersection logic.
-    pattern_generator: A callable that takes a polygon and kwargs, 
-                       returning raw Shapely LineStrings.
+    The Central Pipeline: Takes raw generated lines from a plugin and applies 
+    global transformations, distortions, and boundary clipping.
     """
     poly = _ensure_geom(shape)
     if poly.is_empty or poly.area == 0:
         return []
 
     centroid = poly.centroid
+    
+    # 1. Rotate the shape so the plugin works on a flattened canvas
+    working_poly = poly
     if angle != 0.0:
-        poly = affinity.rotate(poly, -angle, origin=centroid)
+        working_poly = affinity.rotate(poly, -angle, origin=centroid)
 
-    polygons = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
+    global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
+    global_max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
+
     all_fill_paths = []
+    polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
 
     for p in polygons:
-        raw_lines = pattern_generator(p, **kwargs)
+        # 2. Plugin generates raw lines mapping only to 'p'
+        raw_lines = filler.generate(p, **kwargs)
+        if not raw_lines:
+            continue
 
+        # 3. Apply Fisheye / Radial Distortion
+        if fisheye != 0.0 and global_max_r > 0:
+            distorted_lines = []
+            for line in raw_lines:
+                length = line.length
+                if length > 0:
+                    num_segments = max(2, int(math.ceil(length / 0.5)))
+                    points = [line.interpolate(i / num_segments, normalized=True).coords[0] for i in range(num_segments + 1)]
+                    warped_coords = []
+                    for px, py in points:
+                        dx, dy = px - centroid.x, py - centroid.y
+                        r = math.hypot(dx, dy)
+                        factor = 1.0 + fisheye * ((r / global_max_r) ** 2) if r > 0 else 1.0
+                        warped_coords.append((centroid.x + dx * factor, centroid.y + dy * factor))
+                    distorted_lines.append(LineString(warped_coords))
+            raw_lines = distorted_lines
+
+        # 4. Clip to boundary and rotate back
         for line in raw_lines:
             intersection = p.intersection(line)
             clipped_lines = _extract_lines(intersection)
-
+            
             for clipped in clipped_lines:
                 if angle != 0.0:
                     clipped = affinity.rotate(clipped, angle, origin=centroid)
@@ -94,62 +121,50 @@ def _apply_pattern_to_shape(shape, angle, pattern_generator, **kwargs):
 
 @register_fill("zigzag")
 class ZigZagFill:
-    """Generates back-and-forth (zig-zag) fill paths for a closed polygon."""
+    """Generates back-and-forth (zig-zag) fill paths."""
     
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        pass  # Relies on the default --spacing and --angle
+        pass 
 
-    def generate(self, shape: BaseGeometry, spacing: float, angle: float = 0.0, **kwargs: Any) -> List[List[tuple[float, float]]]:
-        def zigzag_generator(p, spacing):
-            minx, miny, maxx, maxy = p.bounds
-            y = miny + spacing
-            lines = []
-            left_to_right = True
+    def generate(self, shape: BaseGeometry, spacing: float, **kwargs: Any) -> List[LineString]:
+        minx, miny, maxx, maxy = shape.bounds
+        y = miny + spacing
+        lines = []
+        left_to_right = True
 
-            while y <= maxy:
-                x1, x2 = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
-                lines.append(LineString([(x1, y), (x2, y)]))
-                y += spacing
-                left_to_right = not left_to_right
+        while y <= maxy:
+            x1, x2 = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
+            lines.append(LineString([(x1, y), (x2, y)]))
+            y += spacing
+            left_to_right = not left_to_right
 
-            return lines
-
-        return _apply_pattern_to_shape(shape, angle, zigzag_generator, spacing=spacing)
+        return lines
 
 
 @register_fill("concentric")
 class ConcentricFill:
-    """Generates concentric (inset) fill paths for a closed polygon."""
+    """Generates concentric (inset) fill paths."""
     
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--ring-simplify", type=float, default=0.2, 
                             help="Simplification tolerance specific to inner concentric rings (default: 0.2)")
 
-    def generate(self, shape: BaseGeometry, spacing: float, ring_simplify: float = 0.2, **kwargs: Any) -> List[List[tuple[float, float]]]:
-        poly = _ensure_geom(shape)
-        if poly.is_empty or poly.area == 0:
-            return []
-
-        all_fill_paths = []
-        current_geom = poly.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
+    def generate(self, shape: BaseGeometry, spacing: float, ring_simplify: float = 0.2, **kwargs: Any) -> List[LineString]:
+        lines = []
+        current_geom = shape.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
 
         while not current_geom.is_empty and current_geom.area > 0:
-            polygons = [
-                current_geom
-            ] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
-
+            polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
             for p in polygons:
                 if p.exterior:
-                    all_fill_paths.append(list(p.exterior.coords))
+                    lines.append(LineString(p.exterior.coords))
                 for interior in p.interiors:
-                    all_fill_paths.append(list(interior.coords))
+                    lines.append(LineString(interior.coords))
+            current_geom = current_geom.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
 
-            current_geom = current_geom.buffer(-spacing).simplify(
-                ring_simplify, preserve_topology=False)
-
-        return all_fill_paths
+        return lines
 
 
 def load_plugins():
@@ -167,5 +182,4 @@ def load_plugins():
         try:
             importlib.import_module(module_name)
         except Exception as e:
-            print(f"Warning: Failed to load plugin '{file_path.name}': {e}",
-                  file=sys.stderr)
+            print(f"Warning: Failed to load plugin '{file_path.name}': {e}", file=sys.stderr)
