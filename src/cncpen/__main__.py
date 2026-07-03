@@ -9,7 +9,12 @@ from shapely.geometry import Polygon
 
 from gscrib import GCodeBuilder
 
-from .fills import *
+from .fills import (
+    generate_zigzag_fill, 
+    generate_sinewave_fill, 
+    generate_concentric_fill, 
+    generate_lichtenberg_fill
+)
 from .utils import extract_dxf_paths
 
 
