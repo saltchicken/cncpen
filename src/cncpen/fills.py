@@ -1,8 +1,22 @@
 import math
 import random
+import importlib
+import sys
+from pathlib import Path
+
 from shapely import affinity
 from shapely.geometry import LineString, Polygon, Point
 from shapely.geometry.base import BaseGeometry
+
+# --- REGISTRY SYSTEM ---
+FILL_REGISTRY = {}
+
+def register_fill(name):
+    """Decorator to automatically register a fill pattern."""
+    def decorator(func):
+        FILL_REGISTRY[name] = func
+        return func
+    return decorator
 
 
 def _ensure_geom(shape):
@@ -67,7 +81,8 @@ def _apply_pattern_to_shape(shape, angle, pattern_generator, **kwargs):
     return all_fill_paths
 
 
-def generate_zigzag_fill(shape, spacing, angle=0.0):
+@register_fill("zigzag")
+def generate_zigzag_fill(shape, spacing, angle=0.0, **kwargs):
     """Generates back-and-forth (zig-zag) fill paths for a closed polygon."""
     
     def zigzag_generator(p, spacing):
@@ -87,7 +102,8 @@ def generate_zigzag_fill(shape, spacing, angle=0.0):
     return _apply_pattern_to_shape(shape, angle, zigzag_generator, spacing=spacing)
 
 
-def generate_sinewave_fill(shape, spacing, amplitude=1.0, wavelength=5.0, angle=0.0):
+@register_fill("sine")
+def generate_sinewave_fill(shape, spacing, amplitude=1.0, wavelength=5.0, angle=0.0, **kwargs):
     """Generates back-and-forth sine wave fill paths for a closed polygon."""
     
     def sinewave_generator(p, spacing, amplitude, wavelength):
@@ -120,7 +136,8 @@ def generate_sinewave_fill(shape, spacing, amplitude=1.0, wavelength=5.0, angle=
                                    spacing=spacing, amplitude=amplitude, wavelength=wavelength)
 
 
-def generate_sacred_geometry_fill(shape, spacing, angle=0.0):
+@register_fill("sacred")
+def generate_sacred_geometry_fill(shape, spacing, angle=0.0, **kwargs):
     """Generates a Flower of Life (overlapping circles) sacred geometry fill."""
     
     def sacred_generator(p, spacing):
@@ -154,7 +171,8 @@ def generate_sacred_geometry_fill(shape, spacing, angle=0.0):
     return _apply_pattern_to_shape(shape, angle, sacred_generator, spacing=spacing)
 
 
-def generate_hilbert_fill(shape, spacing, angle=0.0):
+@register_fill("hilbert")
+def generate_hilbert_fill(shape, spacing, angle=0.0, **kwargs):
     """Generates a highly intricate Hilbert space-filling curve."""
     
     def hilbert_generator(p, spacing):
@@ -189,14 +207,15 @@ def generate_hilbert_fill(shape, spacing, angle=0.0):
     return _apply_pattern_to_shape(shape, angle, hilbert_generator, spacing=spacing)
 
 
-def generate_concentric_fill(shape, spacing, simplify_tolerance=0.2):
+@register_fill("concentric")
+def generate_concentric_fill(shape, spacing, simplify=0.2, **kwargs):
     """Generates concentric (inset) fill paths for a closed polygon."""
     poly = _ensure_geom(shape)
     if poly.is_empty or poly.area == 0:
         return []
 
     all_fill_paths = []
-    current_geom = poly.buffer(-spacing).simplify(simplify_tolerance, preserve_topology=False)
+    current_geom = poly.buffer(-spacing).simplify(simplify, preserve_topology=False)
 
     while not current_geom.is_empty and current_geom.area > 0:
         polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
@@ -207,12 +226,13 @@ def generate_concentric_fill(shape, spacing, simplify_tolerance=0.2):
             for interior in p.interiors:
                 all_fill_paths.append(list(interior.coords))
 
-        current_geom = current_geom.buffer(-spacing).simplify(simplify_tolerance, preserve_topology=False)
+        current_geom = current_geom.buffer(-spacing).simplify(simplify, preserve_topology=False)
 
     return all_fill_paths
 
 
-def generate_lichtenberg_fill(shape, spacing, nodes_count=1000):
+@register_fill("lichtenberg")
+def generate_lichtenberg_fill(shape, spacing, nodes=1000, **kwargs):
     """
     Generates a Lichtenberg-style (branching fractal) fill using an RRT
     (Rapidly-exploring Random Tree) algorithm confined to the polygon.
@@ -226,7 +246,7 @@ def generate_lichtenberg_fill(shape, spacing, nodes_count=1000):
         total_area = poly.area
         for geom in poly.geoms:
             if geom.area > 0:
-                island_nodes = max(10, int(nodes_count * (geom.area / total_area)))
+                island_nodes = max(10, int(nodes * (geom.area / total_area)))
                 all_paths.extend(generate_lichtenberg_fill(geom, spacing, island_nodes))
         return all_paths
 
@@ -240,21 +260,21 @@ def generate_lichtenberg_fill(shape, spacing, nodes_count=1000):
                 root = p
                 break
 
-    nodes = [(root.x, root.y)]
+    nodes_list = [(root.x, root.y)]
     adj = {0: []}
 
-    for _ in range(nodes_count):
+    for _ in range(nodes):
         rx, ry = random.uniform(minx, maxx), random.uniform(miny, maxy)
 
         nearest_idx = 0
         min_dist_sq = float('inf')
-        for i, (nx, ny) in enumerate(nodes):
+        for i, (nx, ny) in enumerate(nodes_list):
             dist_sq = (rx - nx)**2 + (ry - ny)**2
             if dist_sq < min_dist_sq:
                 min_dist_sq = dist_sq
                 nearest_idx = i
 
-        nx, ny = nodes[nearest_idx]
+        nx, ny = nodes_list[nearest_idx]
         dist = math.sqrt(min_dist_sq)
 
         if dist == 0:
@@ -266,20 +286,20 @@ def generate_lichtenberg_fill(shape, spacing, nodes_count=1000):
 
         segment = LineString([(nx, ny), (new_x, new_y)])
         if poly.contains(segment):
-            new_idx = len(nodes)
-            nodes.append((new_x, new_y))
+            new_idx = len(nodes_list)
+            nodes_list.append((new_x, new_y))
             adj[nearest_idx].append(new_idx)
             adj[new_idx] = []
 
     def build_paths(node_idx):
         children = adj[node_idx]
         if not children:
-            return [[nodes[node_idx]]]
+            return [[nodes_list[node_idx]]]
 
         branch_paths = []
         for child_idx in children:
             child_paths = build_paths(child_idx)
-            child_paths[0].insert(0, nodes[node_idx])
+            child_paths[0].insert(0, nodes_list[node_idx])
             branch_paths.extend(child_paths)
             
         return branch_paths
@@ -287,7 +307,8 @@ def generate_lichtenberg_fill(shape, spacing, nodes_count=1000):
     return build_paths(0)
 
 
-def generate_chaotic_affine_fill(shape, spacing, angle=0.0, depth=4, chaos_freq=0.15, chaos_amp=0.8):
+@register_fill("chaotic")
+def generate_chaotic_affine_fill(shape, spacing, angle=0.0, depth=4, chaos_freq=0.15, chaos_amp=0.8, **kwargs):
     """
     Generates a highly irregular, fractal-like fill using a base motif that
     is recursively morphed using spatially-driven affine transformations.
@@ -378,3 +399,21 @@ def generate_chaotic_affine_fill(shape, spacing, angle=0.0, depth=4, chaos_freq=
             all_fill_paths.append(list(line.coords))
 
     return all_fill_paths
+
+
+def load_plugins():
+    """Dynamically loads all modules in the plugins directory."""
+    plugins_dir = Path(__file__).parent / "plugins"
+    
+    if not plugins_dir.exists():
+        return
+
+    for file_path in plugins_dir.glob("*.py"):
+        if file_path.name == "__init__.py":
+            continue
+        
+        module_name = f"cncpen.plugins.{file_path.stem}"
+        try:
+            importlib.import_module(module_name)
+        except Exception as e:
+            print(f"Warning: Failed to load plugin '{file_path.name}': {e}", file=sys.stderr)

@@ -9,15 +9,7 @@ from shapely.geometry import Polygon
 
 from gscrib import GCodeBuilder
 
-from .fills import (
-    generate_zigzag_fill, 
-    generate_sinewave_fill, 
-    generate_concentric_fill, 
-    generate_lichtenberg_fill,
-    generate_sacred_geometry_fill,
-    generate_hilbert_fill,
-    generate_chaotic_affine_fill
-)
+from .fills import FILL_REGISTRY, load_plugins
 from .utils import extract_dxf_paths, optimize_paths_nearest_neighbor
 
 
@@ -93,6 +85,9 @@ class PenTool():
 
 
 def main():
+    # 1. Load all dynamic plugins to populate the registry FIRST
+    load_plugins()
+
     parser = argparse.ArgumentParser(
         description="Generate CNC G-code from a DXF file using a pen tool.")
     parser.add_argument("dxf_file", help="Path to the input DXF file")
@@ -100,8 +95,7 @@ def main():
         "-o",
         "--output",
         default=None,
-        help=
-        "Output G-code filename (default: matches input filename with .nc extension)"
+        help="Output G-code filename (default: matches input filename with .nc extension)"
     )
     parser.add_argument("--feed",
                         type=float,
@@ -110,40 +104,28 @@ def main():
     parser.add_argument("--fill",
                         action="store_true",
                         help="Enable infill for closed shapes")
+    
+    # NEW: Dynamically pull choices from the registry
     parser.add_argument(
         "--pattern",
-        choices=["zigzag", "sine", "concentric", "lichtenberg", "sacred", "hilbert", "chaotic"],
+        choices=list(FILL_REGISTRY.keys()),
         default="zigzag",
-        help="Fill pattern to use if --fill is enabled (default: zigzag)")
-    parser.add_argument("--spacing",
-                        type=float,
-                        default=1.0,
+        help=f"Fill pattern to use if --fill is enabled. Options: {', '.join(FILL_REGISTRY.keys())}"
+    )
+    
+    parser.add_argument("--spacing", type=float, default=1.0,
                         help="Distance between fill lines (default: 1.0)")
-    parser.add_argument("--angle",
-                        type=float,
-                        default=0.0,
+    parser.add_argument("--angle", type=float, default=0.0,
                         help="Angle of the fill in degrees (default: 0.0)")
-    parser.add_argument(
-        "--amplitude",
-        type=float,
-        default=1.0,
-        help="Amplitude for the sine wave pattern (default: 1.0)")
-    parser.add_argument(
-        "--wavelength",
-        type=float,
-        default=5.0,
-        help="Wavelength for the sine wave pattern (default: 5.0)")
-
+    parser.add_argument("--amplitude", type=float, default=1.0,
+                        help="Amplitude for the sine wave pattern (default: 1.0)")
+    parser.add_argument("--wavelength", type=float, default=5.0,
+                        help="Wavelength for the sine wave pattern (default: 5.0)")
     parser.add_argument("--nodes", type=int, default=1500,
                         help="Number of branches/nodes for Lichtenberg fill (default: 1500)")
-
-    parser.add_argument("--simplify",
-                        type=float,
-                        default=0.0,
+    parser.add_argument("--simplify", type=float, default=0.0,
                         help="Simplification tolerance for fills. Higher value = fewer G-code lines (default: 0.0)")
-
-    parser.add_argument("--optimize",
-                        action="store_true",
+    parser.add_argument("--optimize", action="store_true",
                         help="Optimize drawing order using nearest neighbor to minimize travel time")
 
     # Chaotic Affine Fill Parameters
@@ -153,7 +135,6 @@ def main():
                         help="Frequency of the spatial warp for chaotic fill (default: 0.15)")
     parser.add_argument("--chaos-amp", type=float, default=0.8,
                         help="Amplitude/intensity of the spatial warp for chaotic fill (default: 0.8)")
-
 
     args = parser.parse_args()
 
@@ -182,8 +163,6 @@ def main():
 
         # 1. Draw all outlines and collect closed shapes
         for pts in paths_to_draw:
-            # Draw the outer boundary / standard lines
-            # Pass clearance=True to safely hop over screws/clamps to the new entity
             pen.draw_path(pts, clearance=True)
 
             # 2. Collect closed shapes if fill is enabled
@@ -206,46 +185,22 @@ def main():
             # XOR all closed paths to automatically punch out holes
             combined_geom = reduce(operator.xor, closed_polys)
 
-            if args.pattern == "sine":
-                fill_paths = generate_sinewave_fill(
-                    combined_geom,
-                    spacing=args.spacing,
-                    amplitude=args.amplitude,
-                    wavelength=args.wavelength,
-                    angle=args.angle)
-            elif args.pattern == "concentric":
-                fill_paths = generate_concentric_fill(
-                    combined_geom, spacing=args.spacing, simplify_tolerance=args.simplify)
-            elif args.pattern == "lichtenberg":
-                fill_paths = generate_lichtenberg_fill(
-                    combined_geom, spacing=args.spacing, nodes_count=args.nodes)
-            elif args.pattern == "sacred":
-                    fill_paths = generate_sacred_geometry_fill(
-                        combined_geom, spacing=args.spacing, angle=args.angle)
-            elif args.pattern == "hilbert":
-                    fill_paths = generate_hilbert_fill(
-                        combined_geom, spacing=args.spacing, angle=args.angle)
-            elif args.pattern == "chaotic":
-                    fill_paths = generate_chaotic_affine_fill(
-                        combined_geom, 
-                        spacing=args.spacing, 
-                        angle=args.angle,
-                        depth=args.depth,
-                        chaos_freq=args.chaos_freq,
-                        chaos_amp=args.chaos_amp)
-            else:
-                fill_paths = generate_zigzag_fill(
-                    combined_geom, spacing=args.spacing, angle=args.angle)
+            # NEW: Dynamic Function Lookup
+            fill_func = FILL_REGISTRY.get(args.pattern)
+            if not fill_func:
+                print(f"Error: Pattern '{args.pattern}' not found.")
+                sys.exit(1)
+
+            # Execute the function, passing ALL argparse arguments automatically
+            fill_paths = fill_func(combined_geom, **vars(args))
 
             if args.optimize:
                 print("Optimizing fill paths...")
-                # Start optimizing from the pen's last known location to minimize the jump to the first fill
+                # Start optimizing from the pen's last known location
                 last_position = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
                 fill_paths = optimize_paths_nearest_neighbor(fill_paths, start_pt=last_position)
 
             for f_pts in fill_paths:
-                # For fills, clearance is False. The pen will just hop 
-                # between fill lines at rapid_z.
                 pen.draw_path(f_pts, clearance=False)
 
     print(f"G-code successfully saved to {args.output}")
