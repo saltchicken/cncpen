@@ -136,8 +136,8 @@ def main():
 
     parser.add_argument("--simplify",
                         type=float,
-                        default=0.2,
-                        help="Simplification tolerance for fills. Higher value = fewer G-code lines (default: 0.2)")
+                        default=0.0,
+                        help="Simplification tolerance for fills. Higher value = fewer G-code lines (default: 0.0)")
 
     parser.add_argument("--optimize",
                         action="store_true",
