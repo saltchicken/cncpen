@@ -1,7 +1,12 @@
 import math
 import random
-from shapely.geometry import Point, LineString
-from cncpen.fills import register_fill, _ensure_geom
+
+from shapely.geometry import LineString
+from shapely.geometry import Point
+
+from cncpen.fills import _ensure_geom
+from cncpen.fills import register_fill
+
 
 @register_fill("lichtenberg")
 def generate_lichtenberg_fill(shape, spacing, nodes=1000, **kwargs):
@@ -19,7 +24,8 @@ def generate_lichtenberg_fill(shape, spacing, nodes=1000, **kwargs):
         for geom in poly.geoms:
             if geom.area > 0:
                 island_nodes = max(10, int(nodes * (geom.area / total_area)))
-                all_paths.extend(generate_lichtenberg_fill(geom, spacing, island_nodes))
+                all_paths.extend(
+                    generate_lichtenberg_fill(geom, spacing, island_nodes))
         return all_paths
 
     minx, miny, maxx, maxy = poly.bounds
@@ -73,7 +79,7 @@ def generate_lichtenberg_fill(shape, spacing, nodes=1000, **kwargs):
             child_paths = build_paths(child_idx)
             child_paths[0].insert(0, nodes_list[node_idx])
             branch_paths.extend(child_paths)
-            
+
         return branch_paths
 
     return build_paths(0)

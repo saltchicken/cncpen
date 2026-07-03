@@ -1,19 +1,23 @@
 import importlib
-import sys
 from pathlib import Path
+import sys
 
 from shapely import affinity
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString
+from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
 # --- REGISTRY SYSTEM ---
 FILL_REGISTRY = {}
 
+
 def register_fill(name):
     """Decorator to automatically register a fill pattern."""
+
     def decorator(func):
         FILL_REGISTRY[name] = func
         return func
+
     return decorator
 
 
@@ -25,7 +29,7 @@ def _ensure_geom(shape):
         poly = Polygon()
     else:
         poly = Polygon(shape)
-        
+
     if not poly.is_valid or poly.area == 0:
         poly = poly.buffer(0)
     return poly
@@ -63,7 +67,7 @@ def _apply_pattern_to_shape(shape, angle, pattern_generator, **kwargs):
 
     for p in polygons:
         raw_lines = pattern_generator(p, **kwargs)
-        
+
         for line in raw_lines:
             intersection = p.intersection(line)
             clipped_lines = _extract_lines(intersection)
@@ -79,22 +83,26 @@ def _apply_pattern_to_shape(shape, angle, pattern_generator, **kwargs):
 @register_fill("zigzag")
 def generate_zigzag_fill(shape, spacing, angle=0.0, **kwargs):
     """Generates back-and-forth (zig-zag) fill paths for a closed polygon."""
-    
+
     def zigzag_generator(p, spacing):
         minx, miny, maxx, maxy = p.bounds
         y = miny + spacing
         lines = []
         left_to_right = True
-        
+
         while y <= maxy:
-            x1, x2 = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
+            x1, x2 = (minx - 1, maxx + 1) if left_to_right else (maxx + 1,
+                                                                 minx - 1)
             lines.append(LineString([(x1, y), (x2, y)]))
             y += spacing
             left_to_right = not left_to_right
-            
+
         return lines
 
-    return _apply_pattern_to_shape(shape, angle, zigzag_generator, spacing=spacing)
+    return _apply_pattern_to_shape(shape,
+                                   angle,
+                                   zigzag_generator,
+                                   spacing=spacing)
 
 
 @register_fill("concentric")
@@ -105,10 +113,13 @@ def generate_concentric_fill(shape, spacing, simplify=0.2, **kwargs):
         return []
 
     all_fill_paths = []
-    current_geom = poly.buffer(-spacing).simplify(simplify, preserve_topology=False)
+    current_geom = poly.buffer(-spacing).simplify(simplify,
+                                                  preserve_topology=False)
 
     while not current_geom.is_empty and current_geom.area > 0:
-        polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
+        polygons = [
+            current_geom
+        ] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
 
         for p in polygons:
             if p.exterior:
@@ -116,7 +127,8 @@ def generate_concentric_fill(shape, spacing, simplify=0.2, **kwargs):
             for interior in p.interiors:
                 all_fill_paths.append(list(interior.coords))
 
-        current_geom = current_geom.buffer(-spacing).simplify(simplify, preserve_topology=False)
+        current_geom = current_geom.buffer(-spacing).simplify(
+            simplify, preserve_topology=False)
 
     return all_fill_paths
 
@@ -124,16 +136,17 @@ def generate_concentric_fill(shape, spacing, simplify=0.2, **kwargs):
 def load_plugins():
     """Dynamically loads all modules in the plugins directory."""
     plugins_dir = Path(__file__).parent / "plugins"
-    
+
     if not plugins_dir.exists():
         return
 
     for file_path in plugins_dir.glob("*.py"):
         if file_path.name == "__init__.py":
             continue
-        
+
         module_name = f"cncpen.plugins.{file_path.stem}"
         try:
             importlib.import_module(module_name)
         except Exception as e:
-            print(f"Warning: Failed to load plugin '{file_path.name}': {e}", file=sys.stderr)
+            print(f"Warning: Failed to load plugin '{file_path.name}': {e}",
+                  file=sys.stderr)

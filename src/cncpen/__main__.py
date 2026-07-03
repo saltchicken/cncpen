@@ -1,16 +1,18 @@
 import argparse
 from dataclasses import dataclass
+from functools import reduce
 import math
+import operator
 import os
 import sys
-from functools import reduce
-import operator
-from shapely.geometry import Polygon
 
 from gscrib import GCodeBuilder
+from shapely.geometry import Polygon
 
-from .fills import FILL_REGISTRY, load_plugins
-from .utils import extract_dxf_paths, optimize_paths_nearest_neighbor
+from .fills import FILL_REGISTRY
+from .fills import load_plugins
+from .utils import extract_dxf_paths
+from .utils import optimize_paths_nearest_neighbor
 
 
 @dataclass
@@ -46,7 +48,6 @@ class PenTool():
         # Declare the modal feed rate before any G1 moves occur
         self.g.write(f"F{self.config.feed_rate}")
 
-
     def _build_postamble(self):
         """Writes the required final G-code commands."""
         self.g.write("M5")
@@ -54,7 +55,8 @@ class PenTool():
         self.g.write("M2")
 
     def move_to(self, x, y, clearance=False):
-        self.tool_off(clearance=clearance)  # Safely ensure we are at the proper height
+        self.tool_off(
+            clearance=clearance)  # Safely ensure we are at the proper height
         self.g.rapid(x=x, y=y)
 
     def tool_on(self):
@@ -66,8 +68,8 @@ class PenTool():
     def tool_off(self, clearance=False):
         # Determine our target height based on the move type
         target_z = self.config.clearance_z if clearance else self.config.rapid_z
-        
-        # Only lift if we are currently below the target height. 
+
+        # Only lift if we are currently below the target height.
         # (e.g., if we are already at 5.0 clearance, don't drop down to 1.0 rapid)
         if self.current_z is None or self.current_z < target_z:
             self.g.rapid(z=target_z)
@@ -82,8 +84,8 @@ class PenTool():
         self.tool_on()
         for x, y in points[1:]:
             self.g.move(x=x, y=y, f=self.config.feed_rate)
-        
-        # Always end the path by lifting to rapid_z. 
+
+        # Always end the path by lifting to rapid_z.
         # If the NEXT path requires clearance, it will handle the extra lift.
         self.tool_off(clearance=False)
 
@@ -99,7 +101,8 @@ def main():
         "-o",
         "--output",
         default=None,
-        help="Output G-code filename (default: matches input filename with .nc extension)"
+        help=
+        "Output G-code filename (default: matches input filename with .nc extension)"
     )
     parser.add_argument("--feed",
                         type=float,
@@ -108,37 +111,71 @@ def main():
     parser.add_argument("--fill",
                         action="store_true",
                         help="Enable infill for closed shapes")
-    
+
     # NEW: Dynamically pull choices from the registry
     parser.add_argument(
         "--pattern",
         choices=list(FILL_REGISTRY.keys()),
         default="zigzag",
-        help=f"Fill pattern to use if --fill is enabled. Options: {', '.join(FILL_REGISTRY.keys())}"
+        help=
+        f"Fill pattern to use if --fill is enabled. Options: {', '.join(FILL_REGISTRY.keys())}"
     )
-    
-    parser.add_argument("--spacing", type=float, default=1.0,
+
+    parser.add_argument("--spacing",
+                        type=float,
+                        default=1.0,
                         help="Distance between fill lines (default: 1.0)")
-    parser.add_argument("--angle", type=float, default=0.0,
+    parser.add_argument("--angle",
+                        type=float,
+                        default=0.0,
                         help="Angle of the fill in degrees (default: 0.0)")
-    parser.add_argument("--amplitude", type=float, default=1.0,
-                        help="Amplitude for the sine wave pattern (default: 1.0)")
-    parser.add_argument("--wavelength", type=float, default=5.0,
-                        help="Wavelength for the sine wave pattern (default: 5.0)")
-    parser.add_argument("--nodes", type=int, default=1500,
-                        help="Number of branches/nodes for Lichtenberg fill (default: 1500)")
-    parser.add_argument("--simplify", type=float, default=0.0,
-                        help="Simplification tolerance for fills. Higher value = fewer G-code lines (default: 0.0)")
-    parser.add_argument("--optimize", action="store_true",
-                        help="Optimize drawing order using nearest neighbor to minimize travel time")
+    parser.add_argument(
+        "--amplitude",
+        type=float,
+        default=1.0,
+        help="Amplitude for the sine wave pattern (default: 1.0)")
+    parser.add_argument(
+        "--wavelength",
+        type=float,
+        default=5.0,
+        help="Wavelength for the sine wave pattern (default: 5.0)")
+    parser.add_argument(
+        "--nodes",
+        type=int,
+        default=1500,
+        help="Number of branches/nodes for Lichtenberg fill (default: 1500)")
+    parser.add_argument(
+        "--simplify",
+        type=float,
+        default=0.0,
+        help=
+        "Simplification tolerance for fills. Higher value = fewer G-code lines (default: 0.0)"
+    )
+    parser.add_argument(
+        "--optimize",
+        action="store_true",
+        help=
+        "Optimize drawing order using nearest neighbor to minimize travel time")
 
     # Chaotic Affine Fill Parameters
-    parser.add_argument("--depth", type=int, default=4,
-                        help="Recursion depth for fractal fills. Higher = more detail (default: 4)")
-    parser.add_argument("--chaos-freq", type=float, default=0.15,
-                        help="Frequency of the spatial warp for chaotic fill (default: 0.15)")
-    parser.add_argument("--chaos-amp", type=float, default=0.8,
-                        help="Amplitude/intensity of the spatial warp for chaotic fill (default: 0.8)")
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=4,
+        help=
+        "Recursion depth for fractal fills. Higher = more detail (default: 4)")
+    parser.add_argument(
+        "--chaos-freq",
+        type=float,
+        default=0.15,
+        help="Frequency of the spatial warp for chaotic fill (default: 0.15)")
+    parser.add_argument(
+        "--chaos-amp",
+        type=float,
+        default=0.8,
+        help=
+        "Amplitude/intensity of the spatial warp for chaotic fill (default: 0.8)"
+    )
 
     args = parser.parse_args()
 
@@ -148,7 +185,8 @@ def main():
 
     print(f"Reading geometry from {args.dxf_file}...")
 
-    paths_to_draw = extract_dxf_paths(args.dxf_file, simplify_tolerance=args.simplify)
+    paths_to_draw = extract_dxf_paths(args.dxf_file,
+                                      simplify_tolerance=args.simplify)
 
     if args.optimize:
         print("Optimizing outline paths...")
@@ -180,7 +218,8 @@ def main():
                     if poly.is_valid and poly.area > 0:
                         closed_polys.append(poly)
                     else:
-                        poly = poly.buffer(0) # Attempt to fix self-intersections
+                        poly = poly.buffer(
+                            0)  # Attempt to fix self-intersections
                         if poly.area > 0:
                             closed_polys.append(poly)
 
@@ -201,8 +240,10 @@ def main():
             if args.optimize:
                 print("Optimizing fill paths...")
                 # Start optimizing from the pen's last known location
-                last_position = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
-                fill_paths = optimize_paths_nearest_neighbor(fill_paths, start_pt=last_position)
+                last_position = (
+                    0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+                fill_paths = optimize_paths_nearest_neighbor(
+                    fill_paths, start_pt=last_position)
 
             for f_pts in fill_paths:
                 pen.draw_path(f_pts, clearance=False)

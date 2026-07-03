@@ -1,9 +1,12 @@
-import ezdxf
 import math
-from ezdxf.path import make_path
 import sys
-from shapely.geometry import LineString, MultiLineString
+
+import ezdxf
+from ezdxf.path import make_path
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 from shapely.ops import linemerge
+
 
 def extract_dxf_paths(filepath, flatten_distance=0.1, simplify_tolerance=0.0):
     """
@@ -45,10 +48,11 @@ def extract_dxf_paths(filepath, flatten_distance=0.1, simplify_tolerance=0.0):
 
     # NEW: Apply simplification if a tolerance is provided
     if simplify_tolerance > 0:
-        merged_geometry = merged_geometry.simplify(simplify_tolerance, preserve_topology=True)
+        merged_geometry = merged_geometry.simplify(simplify_tolerance,
+                                                   preserve_topology=True)
 
     paths = []
-    
+
     # 3. Format back into point lists for the CNC pen
     if isinstance(merged_geometry, LineString):
         paths.append(list(merged_geometry.coords))
@@ -57,6 +61,7 @@ def extract_dxf_paths(filepath, flatten_distance=0.1, simplify_tolerance=0.0):
             paths.append(list(line.coords))
 
     return paths
+
 
 def optimize_paths_nearest_neighbor(paths, start_pt=(0.0, 0.0)):
     """
