@@ -4,7 +4,7 @@ import sys
 from shapely.geometry import LineString, MultiLineString
 from shapely.ops import linemerge
 
-def extract_dxf_paths(filepath, flatten_distance=0.1):
+def extract_dxf_paths(filepath, flatten_distance=0.1, simplify_tolerance=0.0):
     """
     Reads a DXF file, flattens entities, and stitches disconnected 
     segments together to heal poor SVG-to-DXF conversions.
@@ -41,6 +41,10 @@ def extract_dxf_paths(filepath, flatten_distance=0.1):
 
     # 2. Stitch touching line segments together
     merged_geometry = linemerge(raw_lines)
+
+    # NEW: Apply simplification if a tolerance is provided
+    if simplify_tolerance > 0:
+        merged_geometry = merged_geometry.simplify(simplify_tolerance, preserve_topology=True)
 
     paths = []
     

@@ -147,7 +147,7 @@ def main():
 
     print(f"Reading geometry from {args.dxf_file}...")
 
-    paths_to_draw = extract_dxf_paths(args.dxf_file)
+    paths_to_draw = extract_dxf_paths(args.dxf_file, simplify_tolerance=args.simplify)
     print(f"Extracted {len(paths_to_draw)} draw operations.")
 
     if not paths_to_draw:
