@@ -279,3 +279,77 @@ def generate_lichtenberg_fill(shape, spacing, nodes_count=1000):
         return branch_paths
 
     return build_paths(0)
+
+def generate_sacred_geometry_fill(shape, spacing, angle=0.0):
+    """
+    Generates a Flower of Life (overlapping circles) sacred geometry fill.
+    The 'spacing' parameter dictates the radius of the circles.
+    """
+    poly = _ensure_geom(shape)
+    if poly.is_empty or poly.area == 0:
+        return []
+
+    centroid = poly.centroid
+
+    if angle != 0.0:
+        poly = affinity.rotate(poly, -angle, origin=centroid)
+
+    polygons = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
+    all_fill_paths = []
+
+    # Prevent a 0 radius to avoid infinite loops
+    radius = max(spacing, 0.1) 
+    
+    # Hexagonal grid dimensions
+    dx = radius
+    dy = radius * math.sqrt(3) / 2.0
+
+    for p in polygons:
+        minx, miny, maxx, maxy = p.bounds
+        
+        # Pad the bounding box to ensure the circles cover the entire polygon edge
+        minx -= radius
+        maxx += radius
+        miny -= radius
+        maxy += radius
+
+        circles = []
+        row = 0
+        y = miny
+        
+        # Generate the overlapping grid of circles
+        while y <= maxy:
+            x_offset = (radius / 2.0) if (row % 2 != 0) else 0.0
+            x = minx + x_offset
+            while x <= maxx:
+                # Create a circle outline (LinearRing). 
+                # resolution=32 gives 128 points per circle for smooth CNC curves.
+                circle_outline = Point(x, y).buffer(radius, resolution=32).exterior
+                circles.append(circle_outline)
+                x += dx
+            y += dy
+            row += 1
+
+        # Intersect all generated circles with the actual polygon
+        for circle in circles:
+            intersection = p.intersection(circle)
+            
+            if intersection.is_empty:
+                continue
+            
+            lines = []
+            if intersection.geom_type == 'LineString':
+                lines.append(intersection)
+            elif intersection.geom_type == 'MultiLineString':
+                lines.extend(list(intersection.geoms))
+            elif intersection.geom_type == 'GeometryCollection':
+                for geom in intersection.geoms:
+                    if geom.geom_type == 'LineString':
+                        lines.append(geom)
+
+            for line in lines:
+                if angle != 0.0:
+                    line = affinity.rotate(line, angle, origin=centroid)
+                all_fill_paths.append(list(line.coords))
+
+    return all_fill_paths

@@ -13,7 +13,8 @@ from .fills import (
     generate_zigzag_fill, 
     generate_sinewave_fill, 
     generate_concentric_fill, 
-    generate_lichtenberg_fill
+    generate_lichtenberg_fill,
+    generate_sacred_geometry_fill
 )
 from .utils import extract_dxf_paths, optimize_paths_nearest_neighbor
 
@@ -109,7 +110,7 @@ def main():
                         help="Enable infill for closed shapes")
     parser.add_argument(
         "--pattern",
-        choices=["zigzag", "sine", "concentric", "lichtenberg"],
+        choices=["zigzag", "sine", "concentric", "lichtenberg", "sacred"],
         default="zigzag",
         help="Fill pattern to use if --fill is enabled (default: zigzag)")
     parser.add_argument("--spacing",
@@ -207,6 +208,9 @@ def main():
             elif args.pattern == "lichtenberg":
                 fill_paths = generate_lichtenberg_fill(
                     combined_geom, spacing=args.spacing, nodes_count=args.nodes)
+            elif args.pattern == "sacred":  # <-- Added routing for the new fill
+                    fill_paths = generate_sacred_geometry_fill(
+                        combined_geom, spacing=args.spacing, angle=args.angle)
             else:
                 fill_paths = generate_zigzag_fill(
                     combined_geom, spacing=args.spacing, angle=args.angle)
