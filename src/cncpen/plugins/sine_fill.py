@@ -36,7 +36,6 @@ class SineFill:
             for i in range(num_steps + 1):
                 cx = x_start + i * resolution
                 
-                # --- UNIVERSAL IMAGE MODULATION ---
                 # Default factor is 1.0 if no image sampler is present
                 mod_factor = sampler.get_darkness(cx, y) if sampler else 1.0
                 

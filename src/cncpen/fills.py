@@ -150,21 +150,48 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, **kwargs):
 
 @register_fill("zigzag")
 class ZigZagFill:
-    """Generates back-and-forth (zig-zag) fill paths."""
+    """Generates back-and-forth hatch paths, optionally masked out by image brightness."""
     
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         pass 
 
-    def generate(self, shape: BaseGeometry, spacing: float, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, spacing: float, sampler=None, **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         y = miny + spacing
         lines = []
         left_to_right = True
+        step_res = 1.0 # 1mm sampling intervals for the line breaks
 
         while y <= maxy:
-            x1, x2 = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
-            lines.append(LineString([(x1, y), (x2, y)]))
+            x_start, x_end = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
+            
+            if not sampler:
+                # Standard Mode: Just draw a clean continuous line across the canvas
+                lines.append(LineString([(x_start, y), (x_end, y)]))
+            else:
+                # Photo Mode: Break the line up, only dropping the pen where it's dark
+                current_x = x_start
+                direction = 1.0 if left_to_right else -1.0
+                total_dist = abs(x_end - x_start)
+                steps = int(math.ceil(total_dist / step_res))
+                
+                segment_points = []
+                for i in range(steps + 1):
+                    cx = x_start + (i * step_res * direction)
+                    
+                    # Keep lines only if the area isn't close to pure white
+                    if sampler.get_darkness(cx, y) > 0.1:
+                        segment_points.append((cx, y))
+                    else:
+                        # Break the path if we hit a white area to lift the pen
+                        if len(segment_points) > 1:
+                            lines.append(LineString(segment_points))
+                        segment_points = []
+                        
+                if len(segment_points) > 1:
+                    lines.append(LineString(segment_points))
+
             y += spacing
             left_to_right = not left_to_right
 

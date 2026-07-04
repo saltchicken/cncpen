@@ -11,8 +11,8 @@ from cncpen.fills import register_fill
 @register_fill("morphing_grid")
 class MorphingGridFill:
     """
-    Generates a grid of geometric shapes that morph in complexity,
-    scale, and rotation across the geometry to simulate a waveform progression.
+    Generates a grid of geometric shapes. Morphs in complexity, scale, and rotation 
+    based EITHER on an underlying photo sampler OR a mathematical waveform progression.
     """
     
     @classmethod
@@ -20,10 +20,10 @@ class MorphingGridFill:
         parser.add_argument("--cell-size", type=float, default=5.0,
                             help="Size of the bounding grid for each morphing cell (default: 5.0)")
         parser.add_argument("--morph-cycles", type=float, default=1.0,
-                            help="Number of complete waveform morph cycles across the shape (default: 1.0)")
+                            help="Number of complete waveform morph cycles (ignored if --image is used)")
 
     def generate(self, shape: BaseGeometry, spacing: float, cell_size: float = 5.0, 
-                 morph_cycles: float = 1.0, **kwargs: Any) -> List[LineString]:
+                 morph_cycles: float = 1.0, sampler=None, **kwargs: Any) -> List[LineString]:
         
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
@@ -39,12 +39,17 @@ class MorphingGridFill:
         while y <= maxy:
             x = minx + (step / 2)
             while x <= maxx:
-                nx = (x - minx) / width
-                ny = (y - miny) / height
-
-                t = nx * math.cos(math.pi / 4) + ny * math.sin(math.pi / 4)
-                phase = math.sin(t * math.pi * 2 * morph_cycles)
-                norm_phase = (phase + 1) / 2.0
+                
+                if sampler:
+                    # Photo-Driven Mode
+                    norm_phase = sampler.get_darkness(x, y)
+                else:
+                    # Math-Driven Mode
+                    nx = (x - minx) / width
+                    ny = (y - miny) / height
+                    t = nx * math.cos(math.pi / 4) + ny * math.sin(math.pi / 4)
+                    phase = math.sin(t * math.pi * 2 * morph_cycles)
+                    norm_phase = (phase + 1) / 2.0
 
                 sides = int(3 + (5 * norm_phase))
                 radius = (step / 2.0) * (0.3 + (0.6 * norm_phase))
