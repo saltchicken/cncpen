@@ -25,12 +25,6 @@ def parse_args() -> argparse.Namespace:
         help="Drawing feed rate (default: 400.0)"
     )
     parser.add_argument(
-        "--simplify",
-        type=float,
-        default=0.0,
-        help="Simplification tolerance for drawing paths (default: 0.0)"
-    )
-    parser.add_argument(
         "--optimize",
         action="store_true",
         help="Optimize drawing order using nearest neighbor to minimize travel time"
@@ -68,6 +62,12 @@ def parse_args() -> argparse.Namespace:
             type=float,
             default=0.0,
             help="Apply radial distortion. Try -0.5 for a pinch, or 0.5 for a bulge. (default: 0.0)"
+        )
+        pattern_parser.add_argument(
+            "--simplify",
+            type=float,
+            default=0.0,
+            help="Simplification tolerance applied to generated fill paths (default: 0.0)"
         )
         # Plugin-specific arguments
         plugin_class.setup_cli(pattern_parser)

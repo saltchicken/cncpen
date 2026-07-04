@@ -85,7 +85,7 @@ def _extract_lines(geometry):
     return []
 
 
-def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, **kwargs):
+def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, simplify=0.0, **kwargs):
     """
     The Central Pipeline: Takes raw generated lines from a plugin and applies 
     global transformations, distortions, and boundary clipping.
@@ -111,8 +111,6 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, **kwarg
 
     for p in polygons:
         # 2. Plugin generates raw lines mapping only to 'p'
-        # CLEANUP: Pass sampler explicitly. Plugins that don't need it
-        # will simply absorb it into their **kwargs.
         raw_lines = filler.generate(p, sampler=sampler, **kwargs)
         
         if not raw_lines:
@@ -135,7 +133,7 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, **kwarg
                     distorted_lines.append(LineString(warped_coords))
             raw_lines = distorted_lines
 
-        # 4. Clip to boundary and rotate back
+        # 4. Clip to boundary, rotate back, and optionally simplify
         for line in raw_lines:
             intersection = p.intersection(line)
             clipped_lines = _extract_lines(intersection)
@@ -143,6 +141,11 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, **kwarg
             for clipped in clipped_lines:
                 if angle != 0.0:
                     clipped = affinity.rotate(clipped, angle, origin=centroid)
+                
+                # Apply simplification to the final geometric paths before coordinate extraction
+                if simplify > 0.0:
+                    clipped = clipped.simplify(simplify, preserve_topology=False)
+
                 all_fill_paths.append(list(clipped.coords))
 
     return all_fill_paths

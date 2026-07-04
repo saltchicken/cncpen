@@ -24,8 +24,8 @@ def main() -> None:
     # 3. Handle geometry extraction with the new custom exception
     try:
         paths_to_draw = extract_dxf_paths(
-            args.dxf_file,
-            simplify_tolerance=args.simplify
+            args.dxf_file
+            # Removed simplify_tolerance here as it now targets the fill plugins
         )
     except DXFReadError as e:
         print(f"Fatal Error: {e}", file=sys.stderr)
@@ -76,6 +76,7 @@ def main() -> None:
                 filler = fill_class()
                 
                 # Delegate to the central pipeline
+                # **vars(args) will seamlessly pass 'simplify' down to the pipeline
                 fill_paths = generate_pipeline(
                     filler, 
                     combined_geom, 
