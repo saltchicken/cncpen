@@ -12,6 +12,30 @@ from shapely.geometry.base import BaseGeometry
 # --- REGISTRY SYSTEM ---
 FILL_REGISTRY = {}
 
+from PIL import Image
+
+class ImageSampler:
+    """Maps physical CNC coordinates to image pixels and returns darkness values."""
+    def __init__(self, image_path: str, bounds: tuple):
+        self.img = Image.open(image_path).convert("L")
+        self.minx, self.miny, self.maxx, self.maxy = bounds
+        self.width = self.maxx - self.minx
+        self.height = self.maxy - self.miny
+
+    def get_darkness(self, x: float, y: float) -> float:
+        """Returns a value from 0.0 (pure white) to 1.0 (pure black)."""
+        if self.width == 0 or self.height == 0:
+            return 0.0
+            
+        # Map physical coordinates to pixel coordinates
+        px = int(((x - self.minx) / self.width) * (self.img.width - 1))
+        py = int((1.0 - ((y - self.miny) / self.height)) * (self.img.height - 1))
+        
+        # Clamp to bounds to prevent out-of-range errors during edge sampling
+        px = max(0, min(px, self.img.width - 1))
+        py = max(0, min(py, self.img.height - 1))
+        
+        return (255 - self.img.getpixel((px, py))) / 255.0
 
 class FillPattern(Protocol):
     """Protocol defining the interface for all fill plugins."""
@@ -79,6 +103,11 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, **kwargs):
 
     global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
     global_max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
+
+    sampler = None
+    if kwargs.get("image"):
+        sampler = ImageSampler(kwargs["image"], working_poly.bounds)
+        kwargs["sampler"] = sampler  # Inject it into kwargs for the plugin
 
     all_fill_paths = []
     polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
