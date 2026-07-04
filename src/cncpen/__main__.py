@@ -21,6 +21,12 @@ def main() -> None:
     # 2. Parse arguments via isolated CLI module
     args = parse_args()
 
+    # --- NEW: Print the values of the parameters being used ---
+    print("--- Run Parameters ---")
+    for key, value in vars(args).items():
+        print(f"{key}: {value}")
+    print("----------------------\n")
+
     print(f"Reading geometry from {args.dxf_file}...")
 
     # 3. Handle geometry extraction with the new custom exception
@@ -94,6 +100,14 @@ def main() -> None:
 
                 for f_pts in fill_paths:
                     pen.draw_path(f_pts, clearance=False)
+
+    # --- NEW: Print the total number of G-code lines produced ---
+    try:
+        with open(args.output, 'r') as f:
+            line_count = sum(1 for _ in f)
+        print(f"\nTotal G-code lines produced: {line_count}")
+    except Exception as e:
+        print(f"\nCould not count lines in output file: {e}")
 
     print(f"G-code successfully saved to {args.output}")
 
