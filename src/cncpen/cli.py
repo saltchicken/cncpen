@@ -36,12 +36,6 @@ def parse_args() -> argparse.Namespace:
         help="Optimize drawing order using nearest neighbor to minimize travel time"
     )
 
-    parser.add_argument(
-        "--image", 
-        default=None, 
-        help="Optional image to modulate fill patterns with photo data"
-    )
-
     # Subparsers for fill patterns
     subparsers = parser.add_subparsers(
         dest="pattern", 
@@ -52,6 +46,11 @@ def parse_args() -> argparse.Namespace:
         pattern_parser = subparsers.add_parser(name, help=f"Use the {name} fill pattern.")
         
         # Common arguments applied to all fills
+        pattern_parser.add_argument(
+            "--image", 
+            default=None, 
+            help="Optional image to modulate fill patterns with photo data"
+        )
         pattern_parser.add_argument(
             "--spacing",
             type=float,
