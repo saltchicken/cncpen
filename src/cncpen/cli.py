@@ -22,8 +22,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--feed",
         type=float,
-        default=400.0,
-        help="Drawing feed rate (default: 400.0)"
+        default=1200.0,
+        help="Drawing feed rate (default: 1200.0)"
     )
     parser.add_argument(
         "--no-optimize",
@@ -57,8 +57,8 @@ def parse_args() -> argparse.Namespace:
         pattern_parser.add_argument(
             "--threshold", 
             type=float, 
-            default=0.1,
-            help="Darkness cutoff (0.0 to 1.0) when using --image. Increase this to draw less. (default: 0.1)"
+            default=0.5,
+            help="Darkness cutoff (0.0 to 1.0) when using --image. Increase this to draw less. (default: 0.5)"
         )
         pattern_parser.add_argument(
             "--spacing",
