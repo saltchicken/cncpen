@@ -24,8 +24,8 @@ def main() -> None:
     # 3. Handle geometry extraction with the new custom exception
     try:
         paths_to_draw = extract_dxf_paths(
-            args.dxf_file
-            # Removed simplify_tolerance here as it now targets the fill plugins
+            args.dxf_file,
+            simplify_tolerance=args.outline_simplify
         )
     except DXFReadError as e:
         print(f"Fatal Error: {e}", file=sys.stderr)

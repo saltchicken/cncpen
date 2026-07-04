@@ -30,6 +30,13 @@ def parse_args() -> argparse.Namespace:
         help="Disable optimize algorithm for drawing order using nearest neighbor to minimize travel time"
     )
 
+    parser.add_argument(
+        "--outline-simplify",
+        type=float,
+        default=0.0,
+        help="Simplification tolerance for base DXF outline drawing paths (default: 0.0)"
+    )
+
     # Subparsers for fill patterns
     subparsers = parser.add_subparsers(
         dest="pattern", 
