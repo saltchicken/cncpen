@@ -200,24 +200,61 @@ class ZigZagFill:
 
 @register_fill("concentric")
 class ConcentricFill:
-    """Generates concentric (inset) fill paths."""
+    """Generates concentric (inset) fill paths, optionally masked by image brightness."""
     
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--ring-simplify", type=float, default=0.2, 
-                            help="Simplification tolerance specific to inner concentric rings (default: 0.2)")
+                            help="Simplification tolerance specific to inner rings (default: 0.2)")
+        parser.add_argument("--threshold", type=float, default=0.1,
+                            help="Darkness cutoff (0.0 to 1.0) when using --image. Increase this to draw less. (default: 0.1)")
 
-    def generate(self, shape: BaseGeometry, spacing: float, ring_simplify: float = 0.2, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, spacing: float, ring_simplify: float = 0.2, 
+                 threshold: float = 0.1, sampler=None, **kwargs: Any) -> List[LineString]:
         lines = []
         current_geom = shape.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
+        step_res = 1.0  # 1mm sampling intervals for the line breaks
+
+        def process_ring(coords):
+            ring_line = LineString(coords)
+            
+            if not sampler:
+                # Standard Mode: Draw the continuous ring
+                return [ring_line]
+            
+            # Photo Mode: Walk along the ring and lift the pen in light areas
+            segments = []
+            current_segment = []
+            
+            length = ring_line.length
+            steps = max(2, int(math.ceil(length / step_res)))
+            
+            for i in range(steps + 1):
+                pt = ring_line.interpolate(i / steps, normalized=True)
+                cx, cy = pt.x, pt.y
+                
+                # Check against the user-defined threshold instead of 0.1
+                if sampler.get_darkness(cx, cy) > threshold:
+                    current_segment.append((cx, cy))
+                else:
+                    # Break the path if we hit an area lighter than the threshold
+                    if len(current_segment) > 1:
+                        segments.append(LineString(current_segment))
+                    current_segment = []
+                    
+            if len(current_segment) > 1:
+                segments.append(LineString(current_segment))
+                
+            return segments
 
         while not current_geom.is_empty and current_geom.area > 0:
             polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
             for p in polygons:
                 if p.exterior:
-                    lines.append(LineString(p.exterior.coords))
+                    lines.extend(process_ring(p.exterior.coords))
                 for interior in p.interiors:
-                    lines.append(LineString(interior.coords))
+                    lines.extend(process_ring(interior.coords))
+                    
             current_geom = current_geom.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
 
         return lines
