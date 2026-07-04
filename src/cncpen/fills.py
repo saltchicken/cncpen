@@ -154,9 +154,10 @@ class ZigZagFill:
     
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        pass 
+        parser.add_argument("--threshold", type=float, default=0.1,
+                            help="Darkness cutoff (0.0 to 1.0) when using --image. Increase this to draw less. (default: 0.1)")
 
-    def generate(self, shape: BaseGeometry, spacing: float, sampler=None, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, spacing: float, threshold: float=0.1, sampler=None, **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         y = miny + spacing
         lines = []
@@ -181,7 +182,7 @@ class ZigZagFill:
                     cx = x_start + (i * step_res * direction)
                     
                     # Keep lines only if the area isn't close to pure white
-                    if sampler.get_darkness(cx, y) > 0.1:
+                    if sampler.get_darkness(cx, y) > threshold:
                         segment_points.append((cx, y))
                     else:
                         # Break the path if we hit a white area to lift the pen
