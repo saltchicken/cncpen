@@ -10,7 +10,7 @@ from cncpen.fills import register_fill, ImageSampler
 
 
 @register_fill("photo-contour")
-class PhotoConcentricFill:
+class PhotoContourFill:
     """Generates topographic concentric contours driven by image darkness."""
     
     # Prevents the central pipeline from dashing the lines based on darkness
@@ -37,7 +37,7 @@ class PhotoConcentricFill:
             help="Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
         )
 
-    def generate(self, shape: BaseGeometry, sampler: ImageSampler = None, levels: int = 15, resolution: float = 0.5, min_length: float = 2.0, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, sampler: ImageSampler = None, levels: int = 1, resolution: float = 0.5, min_length: float = 2.0, **kwargs: Any) -> List[LineString]:
         if not sampler:
             print("Warning: 'photo-concentric' requires an --image argument. Returning empty fill.")
             return []
