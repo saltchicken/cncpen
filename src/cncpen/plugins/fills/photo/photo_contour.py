@@ -11,7 +11,7 @@ from cncpen.fills import register_fill, ImageSampler
 
 @register_fill("photo-contour")
 class PhotoContourFill:
-    """Generates topographic concentric contours driven by image darkness."""
+    """Generates topographic contours driven by image darkness."""
     
     # Prevents the central pipeline from dashing the lines based on darkness
     handles_image_natively = True
@@ -21,8 +21,8 @@ class PhotoContourFill:
         parser.add_argument(
             "--levels", 
             type=int, 
-            default=15,
-            help="Number of concentric contour levels to extract from the image (default: 15)"
+            default=1,
+            help="Number of contour levels to extract from the image (default: 15)"
         )
         parser.add_argument(
             "--resolution", 
@@ -39,7 +39,7 @@ class PhotoContourFill:
 
     def generate(self, shape: BaseGeometry, sampler: ImageSampler = None, levels: int = 1, resolution: float = 0.5, min_length: float = 2.0, **kwargs: Any) -> List[LineString]:
         if not sampler:
-            print("Warning: 'photo-concentric' requires an --image argument. Returning empty fill.")
+            print("Warning: 'photo-contour' requires an --image argument. Returning empty fill.")
             return []
 
         minx, miny, maxx, maxy = shape.bounds
