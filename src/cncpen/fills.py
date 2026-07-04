@@ -186,18 +186,27 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, simplif
 
 
 def load_plugins():
-    """Dynamically loads all modules in the plugins directory."""
+    """Dynamically loads all modules in the plugins directory and subdirectories."""
     plugins_dir = Path(__file__).parent / "plugins"
 
     if not plugins_dir.exists():
         return
 
-    for file_path in plugins_dir.glob("*.py"):
+    # 1. Use rglob (recursive glob) to search all subfolders
+    for file_path in plugins_dir.rglob("*.py"):
         if file_path.name == "__init__.py":
             continue
 
-        module_name = f"cncpen.plugins.{file_path.stem}"
+        # 2. Calculate the relative path to properly format the module import string
+        relative_path = file_path.relative_to(plugins_dir)
+        
+        # e.g., from "math_patterns/spiral.py" -> ["math_patterns", "spiral"]
+        module_parts = list(relative_path.parts[:-1]) + [relative_path.stem]
+        module_path = ".".join(module_parts)
+        
+        module_name = f"cncpen.plugins.{module_path}"
+        
         try:
             importlib.import_module(module_name)
         except Exception as e:
-            print(f"Warning: Failed to load plugin '{file_path.name}': {e}", file=sys.stderr)
+            print(f"Warning: Failed to load plugin '{relative_path}': {e}", file=sys.stderr)
