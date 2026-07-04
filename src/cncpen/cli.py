@@ -1,5 +1,6 @@
 import argparse
 import os
+import argcomplete
 
 from .fills import FILL_REGISTRY
 
@@ -11,7 +12,7 @@ def parse_args() -> argparse.Namespace:
     )
     
     # Global arguments
-    parser.add_argument("dxf_file", help="Path to the input DXF file")
+    parser.add_argument("dxf_file", help="Path to the input DXF file").completer = argcomplete.completers.FilesCompleter(allowednames=(".dxf",))
     parser.add_argument(
         "-o",
         "--output",
@@ -51,7 +52,8 @@ def parse_args() -> argparse.Namespace:
             "--image", 
             default=None, 
             help="Optional image to modulate fill patterns with photo data"
-        )
+        ).completer = argcomplete.completers.FilesCompleter(allowednames=(".png", ".jpg", ".jpeg"))
+        
         pattern_parser.add_argument(
             "--threshold", 
             type=float, 
@@ -85,6 +87,9 @@ def parse_args() -> argparse.Namespace:
         
         # Plugin-specific arguments
         plugin_class.setup_cli(pattern_parser)
+
+    # Activate argcomplete here
+    argcomplete.autocomplete(parser)
 
     args = parser.parse_args()
 

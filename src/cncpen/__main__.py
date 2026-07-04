@@ -1,3 +1,5 @@
+# PYTHON_ARGCOMPLETE_OK
+
 import math
 import operator
 import sys
