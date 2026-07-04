@@ -85,7 +85,7 @@ def _extract_lines(geometry):
     return []
 
 
-def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, **kwargs):
+def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, **kwargs):
     """
     The Central Pipeline: Takes raw generated lines from a plugin and applies 
     global transformations, distortions, and boundary clipping.
@@ -104,17 +104,17 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, **kwargs):
     global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
     global_max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
 
-    sampler = None
-    if kwargs.get("image"):
-        sampler = ImageSampler(kwargs["image"], working_poly.bounds)
-        kwargs["sampler"] = sampler  # Inject it into kwargs for the plugin
+    sampler = ImageSampler(image, working_poly.bounds) if image else None
 
     all_fill_paths = []
     polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
 
     for p in polygons:
         # 2. Plugin generates raw lines mapping only to 'p'
-        raw_lines = filler.generate(p, **kwargs)
+        # CLEANUP: Pass sampler explicitly. Plugins that don't need it
+        # will simply absorb it into their **kwargs.
+        raw_lines = filler.generate(p, sampler=sampler, **kwargs)
+        
         if not raw_lines:
             continue
 
