@@ -10,7 +10,6 @@ from shapely.geometry import LineString, Polygon
 from shapely.geometry.base import BaseGeometry
 from PIL import Image
 
-# --- REGISTRY SYSTEM ---
 FILL_REGISTRY = {}
 
 
@@ -184,55 +183,6 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, simplif
                 all_fill_paths.append(list(clipped.coords))
 
     return all_fill_paths
-
-
-@register_fill("zigzag")
-class ZigZagFill:
-    """Generates simple back-and-forth hatch paths."""
-    
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        pass # Global arguments handle everything needed here
-
-    def generate(self, shape: BaseGeometry, spacing: float, **kwargs: Any) -> List[LineString]:
-        minx, miny, maxx, maxy = shape.bounds
-        y = miny + spacing
-        lines = []
-        left_to_right = True
-        
-        while y <= maxy:
-            x_start, x_end = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
-            lines.append(LineString([(x_start, y), (x_end, y)]))
-            y += spacing
-            left_to_right = not left_to_right
-
-        return lines
-
-
-@register_fill("concentric")
-class ConcentricFill:
-    """Generates concentric (inset) fill paths."""
-    
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--ring-simplify", type=float, default=0.2, 
-                            help="Simplification tolerance specific to inner rings (default: 0.2)")
-
-    def generate(self, shape: BaseGeometry, spacing: float, ring_simplify: float = 0.2, **kwargs: Any) -> List[LineString]:
-        lines = []
-        current_geom = shape.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
-
-        while not current_geom.is_empty and current_geom.area > 0:
-            polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
-            for p in polygons:
-                if p.exterior:
-                    lines.append(LineString(p.exterior.coords))
-                for interior in p.interiors:
-                    lines.append(LineString(interior.coords))
-                    
-            current_geom = current_geom.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
-
-        return lines
 
 
 def load_plugins():
