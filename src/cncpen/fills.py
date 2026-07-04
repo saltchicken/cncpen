@@ -8,11 +8,11 @@ from typing import Protocol, List, Any
 from shapely import affinity
 from shapely.geometry import LineString, Polygon
 from shapely.geometry.base import BaseGeometry
+from PIL import Image
 
 # --- REGISTRY SYSTEM ---
 FILL_REGISTRY = {}
 
-from PIL import Image
 
 class ImageSampler:
     """Maps physical CNC coordinates to image pixels and returns darkness values."""
@@ -36,6 +36,7 @@ class ImageSampler:
         py = max(0, min(py, self.img.height - 1))
         
         return (255 - self.img.getpixel((px, py))) / 255.0
+
 
 class FillPattern(Protocol):
     """Protocol defining the interface for all fill plugins."""
@@ -85,6 +86,36 @@ def _extract_lines(geometry):
     return []
 
 
+def _apply_image_mask(lines: List[LineString], sampler: ImageSampler, threshold: float) -> List[LineString]:
+    """Breaks continuous lines into segments based on image darkness."""
+    step_res = 1.0  # 1mm sampling intervals
+    masked_lines = []
+    
+    for line in lines:
+        length = line.length
+        if length == 0:
+            continue
+            
+        steps = max(2, int(math.ceil(length / step_res)))
+        current_segment = []
+        
+        for i in range(steps + 1):
+            pt = line.interpolate(i / steps, normalized=True)
+            cx, cy = pt.x, pt.y
+            
+            if sampler.get_darkness(cx, cy) > threshold:
+                current_segment.append((cx, cy))
+            else:
+                if len(current_segment) > 1:
+                    masked_lines.append(LineString(current_segment))
+                current_segment = []
+                
+        if len(current_segment) > 1:
+            masked_lines.append(LineString(current_segment))
+            
+    return masked_lines
+
+
 def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, simplify=0.0, **kwargs):
     """
     The Central Pipeline: Takes raw generated lines from a plugin and applies 
@@ -116,6 +147,11 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, simplif
         if not raw_lines:
             continue
 
+        # 2.5 Apply generic image masking ONLY if the plugin doesn't handle it natively
+        if sampler and not getattr(filler, 'handles_image_natively', False):
+            threshold = kwargs.get('threshold', 0.1)
+            raw_lines = _apply_image_mask(raw_lines, sampler, threshold)
+
         # 3. Apply Fisheye / Radial Distortion
         if fisheye != 0.0 and global_max_r > 0:
             distorted_lines = []
@@ -142,7 +178,6 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, simplif
                 if angle != 0.0:
                     clipped = affinity.rotate(clipped, angle, origin=centroid)
                 
-                # Apply simplification to the final geometric paths before coordinate extraction
                 if simplify > 0.0:
                     clipped = clipped.simplify(simplify, preserve_topology=False)
 
@@ -153,49 +188,21 @@ def generate_pipeline(filler, shape, angle=0.0, fisheye=0.0, image=None, simplif
 
 @register_fill("zigzag")
 class ZigZagFill:
-    """Generates back-and-forth hatch paths, optionally masked out by image brightness."""
+    """Generates simple back-and-forth hatch paths."""
     
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--threshold", type=float, default=0.1,
-                            help="Darkness cutoff (0.0 to 1.0) when using --image. Increase this to draw less. (default: 0.1)")
+        pass # Global arguments handle everything needed here
 
-    def generate(self, shape: BaseGeometry, spacing: float, threshold: float=0.1, sampler=None, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, spacing: float, **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         y = miny + spacing
         lines = []
         left_to_right = True
-        step_res = 1.0 # 1mm sampling intervals for the line breaks
-
+        
         while y <= maxy:
             x_start, x_end = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
-            
-            if not sampler:
-                # Standard Mode: Just draw a clean continuous line across the canvas
-                lines.append(LineString([(x_start, y), (x_end, y)]))
-            else:
-                # Photo Mode: Break the line up, only dropping the pen where it's dark
-                current_x = x_start
-                direction = 1.0 if left_to_right else -1.0
-                total_dist = abs(x_end - x_start)
-                steps = int(math.ceil(total_dist / step_res))
-                
-                segment_points = []
-                for i in range(steps + 1):
-                    cx = x_start + (i * step_res * direction)
-                    
-                    # Keep lines only if the area isn't close to pure white
-                    if sampler.get_darkness(cx, y) > threshold:
-                        segment_points.append((cx, y))
-                    else:
-                        # Break the path if we hit a white area to lift the pen
-                        if len(segment_points) > 1:
-                            lines.append(LineString(segment_points))
-                        segment_points = []
-                        
-                if len(segment_points) > 1:
-                    lines.append(LineString(segment_points))
-
+            lines.append(LineString([(x_start, y), (x_end, y)]))
             y += spacing
             left_to_right = not left_to_right
 
@@ -204,60 +211,24 @@ class ZigZagFill:
 
 @register_fill("concentric")
 class ConcentricFill:
-    """Generates concentric (inset) fill paths, optionally masked by image brightness."""
+    """Generates concentric (inset) fill paths."""
     
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--ring-simplify", type=float, default=0.2, 
                             help="Simplification tolerance specific to inner rings (default: 0.2)")
-        parser.add_argument("--threshold", type=float, default=0.1,
-                            help="Darkness cutoff (0.0 to 1.0) when using --image. Increase this to draw less. (default: 0.1)")
 
-    def generate(self, shape: BaseGeometry, spacing: float, ring_simplify: float = 0.2, 
-                 threshold: float = 0.1, sampler=None, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, spacing: float, ring_simplify: float = 0.2, **kwargs: Any) -> List[LineString]:
         lines = []
         current_geom = shape.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
-        step_res = 1.0  # 1mm sampling intervals for the line breaks
-
-        def process_ring(coords):
-            ring_line = LineString(coords)
-            
-            if not sampler:
-                # Standard Mode: Draw the continuous ring
-                return [ring_line]
-            
-            # Photo Mode: Walk along the ring and lift the pen in light areas
-            segments = []
-            current_segment = []
-            
-            length = ring_line.length
-            steps = max(2, int(math.ceil(length / step_res)))
-            
-            for i in range(steps + 1):
-                pt = ring_line.interpolate(i / steps, normalized=True)
-                cx, cy = pt.x, pt.y
-                
-                # Check against the user-defined threshold instead of 0.1
-                if sampler.get_darkness(cx, cy) > threshold:
-                    current_segment.append((cx, cy))
-                else:
-                    # Break the path if we hit an area lighter than the threshold
-                    if len(current_segment) > 1:
-                        segments.append(LineString(current_segment))
-                    current_segment = []
-                    
-            if len(current_segment) > 1:
-                segments.append(LineString(current_segment))
-                
-            return segments
 
         while not current_geom.is_empty and current_geom.area > 0:
             polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
             for p in polygons:
                 if p.exterior:
-                    lines.extend(process_ring(p.exterior.coords))
+                    lines.append(LineString(p.exterior.coords))
                 for interior in p.interiors:
-                    lines.extend(process_ring(interior.coords))
+                    lines.append(LineString(interior.coords))
                     
             current_geom = current_geom.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
 

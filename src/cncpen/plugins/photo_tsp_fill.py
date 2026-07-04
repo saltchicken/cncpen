@@ -1,16 +1,20 @@
 import random
 import math
 import argparse
+from typing import List, Any
 from shapely.geometry import LineString
+from shapely.geometry.base import BaseGeometry
 from cncpen.fills import register_fill
 
 @register_fill("photo_tsp")
 class PhotoTSPFill:
+    handles_image_natively = True
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--nodes", type=int, default=2000, help="Number of nodes to connect")
 
-    def generate(self, shape, nodes: int, sampler=None, **kwargs) -> list[LineString]:
+    def generate(self, shape: BaseGeometry, nodes: int = 2000, sampler=None, **kwargs: Any) -> List[LineString]:
         if not sampler:
             return []
             

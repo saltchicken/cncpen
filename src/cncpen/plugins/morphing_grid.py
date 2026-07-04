@@ -15,6 +15,8 @@ class MorphingGridFill:
     based EITHER on an underlying photo sampler OR a mathematical waveform progression.
     """
     
+    handles_image_natively = True
+    
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--cell-size", type=float, default=5.0,

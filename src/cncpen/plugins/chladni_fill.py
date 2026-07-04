@@ -15,6 +15,8 @@ class ChladniFill:
     Generates Chladni resonant plate patterns using a marching squares algorithm.
     If an image sampler is provided, it warps the resonant nodes based on the photo's darkness.
     """
+    
+    handles_image_natively = True
 
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
@@ -27,7 +29,7 @@ class ChladniFill:
         parser.add_argument("--res", type=float, default=0.5,
                             help="Grid sampling resolution for tracing lines (default: 0.5)")
 
-    def generate(self, shape: BaseGeometry, spacing: float, n: float = 3.0,
+    def generate(self, shape: BaseGeometry, n: float = 3.0,
                  m: float = 5.0, sign: float = -1.0, res: float = 0.5,
                  sampler=None, simplify: float = 0.0, **kwargs: Any) -> List[LineString]:
         

@@ -46,6 +46,12 @@ def parse_args() -> argparse.Namespace:
             help="Optional image to modulate fill patterns with photo data"
         )
         pattern_parser.add_argument(
+            "--threshold", 
+            type=float, 
+            default=0.1,
+            help="Darkness cutoff (0.0 to 1.0) when using --image. Increase this to draw less. (default: 0.1)"
+        )
+        pattern_parser.add_argument(
             "--spacing",
             type=float,
             default=1.0,
@@ -69,6 +75,7 @@ def parse_args() -> argparse.Namespace:
             default=0.0,
             help="Simplification tolerance applied to generated fill paths (default: 0.0)"
         )
+        
         # Plugin-specific arguments
         plugin_class.setup_cli(pattern_parser)
 

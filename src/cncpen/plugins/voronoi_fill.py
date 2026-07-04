@@ -13,6 +13,8 @@ from cncpen.fills import register_fill
 class VoronoiFill:
     """Generates a Voronoi diagram fill based on random or image-weighted sites."""
 
+    handles_image_natively = True
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(

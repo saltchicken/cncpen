@@ -1,14 +1,18 @@
 import argparse
+from typing import List, Any
 from shapely.geometry import LineString
+from shapely.geometry.base import BaseGeometry
 from cncpen.fills import register_fill
 
 @register_fill("photo_hatch")
 class PhotoHatchFill:
+    handles_image_natively = True
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--cell-size", type=float, default=2.0, help="Size of the hatching grid cells")
 
-    def generate(self, shape, cell_size: float, sampler=None, **kwargs) -> list[LineString]:
+    def generate(self, shape: BaseGeometry, cell_size: float = 2.0, sampler=None, **kwargs: Any) -> List[LineString]:
         if not sampler:
             return []
             

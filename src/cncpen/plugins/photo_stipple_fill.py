@@ -1,15 +1,19 @@
 import random
 import argparse
+from typing import List, Any
 from shapely.geometry import LineString
+from shapely.geometry.base import BaseGeometry
 from cncpen.fills import register_fill
 
 @register_fill("photo_stipple")
 class PhotoStippleFill:
+    handles_image_natively = True
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--dots", type=int, default=5000, help="Target number of stipple dots")
 
-    def generate(self, shape, dots: int, sampler=None, **kwargs) -> list[LineString]:
+    def generate(self, shape: BaseGeometry, dots: int = 5000, sampler=None, **kwargs: Any) -> List[LineString]:
         if not sampler:
             return []
             

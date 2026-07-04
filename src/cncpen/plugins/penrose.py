@@ -26,7 +26,7 @@ class PenroseFill:
             help="Recursion depth for triangle deflation. Higher = smaller tiles (default: 5)",
         )
 
-    def generate(self, shape: BaseGeometry, spacing: float, depth: int = 5, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, depth: int = 5, **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y
         
