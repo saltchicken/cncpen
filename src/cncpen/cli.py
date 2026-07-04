@@ -38,6 +38,12 @@ def parse_args() -> argparse.Namespace:
         help="Simplification tolerance for base DXF outline drawing paths (default: 0.0)"
     )
 
+    parser.add_argument(
+        "--no-outline",
+        action="store_true",
+        help="Disable drawing the original DXF paths (useful if you only want the fill pattern)."
+    )
+
     # Subparsers for fill patterns
     subparsers = parser.add_subparsers(
         dest="pattern", 

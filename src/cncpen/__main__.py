@@ -57,7 +57,8 @@ def main() -> None:
         
         # Draw all outlines and collect closed shapes
         for pts in paths_to_draw:
-            pen.draw_path(pts, clearance=True)
+            if not args.no_outline:
+                pen.draw_path(pts, clearance=True)
 
             # Collect closed shapes if a fill pattern was requested
             if args.pattern and len(pts) > 2:
