@@ -31,7 +31,7 @@ def main() -> None:
         print(f"Fatal Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    if args.optimize:
+    if not args.no_optimize:
         print("Optimizing outline paths...")
         paths_to_draw = optimize_paths_nearest_neighbor(paths_to_draw)
 
@@ -83,7 +83,7 @@ def main() -> None:
                     **vars(args)
                 )
 
-                if args.optimize:
+                if not args.no_optimize:
                     print(f"Optimizing {args.pattern} fill paths...")
                     last_position = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
                     fill_paths = optimize_paths_nearest_neighbor(

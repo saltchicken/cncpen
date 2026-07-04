@@ -25,9 +25,9 @@ def parse_args() -> argparse.Namespace:
         help="Drawing feed rate (default: 400.0)"
     )
     parser.add_argument(
-        "--optimize",
+        "--no-optimize",
         action="store_true",
-        help="Optimize drawing order using nearest neighbor to minimize travel time"
+        help="Disable optimize algorithm for drawing order using nearest neighbor to minimize travel time"
     )
 
     # Subparsers for fill patterns
