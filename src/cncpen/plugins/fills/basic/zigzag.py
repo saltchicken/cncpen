@@ -1,4 +1,5 @@
 import argparse
+import argcomplete
 from typing import Any, List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
