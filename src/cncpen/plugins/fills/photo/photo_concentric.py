@@ -36,6 +36,7 @@ class PhotoConcentricFill:
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
         sampler = getattr(context.args, 'sampler', None)
+        # TODO: apply `spacing = getattr(context.args, 'spacing', 2.0)` to all plugins
         spacing = context.args.spacing
         threshold = getattr(context.args, 'threshold', 0.5)
         resolution = getattr(context.args, 'resolution', 0.25)
