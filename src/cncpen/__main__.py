@@ -2,31 +2,36 @@
 # PYTHON_ARGCOMPLETE_OK
 
 import argparse
+from dataclasses import dataclass
+from functools import partial
+from functools import reduce
 import math
 import operator
 import os
+from pathlib import Path
 import random
 import sys
-from dataclasses import dataclass
-from functools import partial, reduce
-from pathlib import Path
 from typing import Any, Callable, List, Optional, Protocol, Tuple, Union
 
 import argcomplete
 import ezdxf
-import numpy as np
 from ezdxf.path import make_path
 from gscrib import GCodeBuilder
+import numpy as np
 from PIL import Image
 from shapely import affinity
-from shapely.geometry import LineString, MultiLineString, Polygon
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
+from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
 from skimage import measure
 
+
 class DXFReadError(Exception):
     """Raised when a DXF file cannot be successfully read or parsed."""
     pass
+
 
 def extract_dxf_paths(
         filepath: Union[str, Path],
@@ -51,8 +56,9 @@ def extract_dxf_paths(
                 if len(vertices) > 1:
                     raw_lines.append(LineString([(v.x, v.y) for v in vertices]))
             except Exception as e:
-                print(f"Warning: could not process {entity.dxftype()} entity: {e}",
-                      file=sys.stderr)
+                print(
+                    f"Warning: could not process {entity.dxftype()} entity: {e}",
+                    file=sys.stderr)
 
     if not raw_lines:
         return []
@@ -166,20 +172,25 @@ MODIFICATION_REGISTRY = {}
 
 
 def register_fill(name):
+
     def decorator(cls):
         FILL_REGISTRY[name] = cls
         return cls
+
     return decorator
 
 
 def register_modification(name):
+
     def decorator(cls):
         MODIFICATION_REGISTRY[name] = cls
         return cls
+
     return decorator
 
 
 class ImageSampler:
+
     def __init__(self, image_path: str, bounds: tuple):
         self.img = Image.open(image_path).convert("L")
         self.minx, self.miny, self.maxx, self.maxy = bounds
@@ -202,6 +213,7 @@ class ImageSampler:
 
 
 class FillPattern(Protocol):
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         ...
@@ -211,6 +223,7 @@ class FillPattern(Protocol):
 
 
 class PathModification(Protocol):
+
     @classmethod
     def setup_cli(cls, parser: argparse._ArgumentGroup) -> None:
         ...
@@ -218,7 +231,8 @@ class PathModification(Protocol):
     def is_active(self, args: argparse.Namespace) -> bool:
         ...
 
-    def apply(self, lines: List[LineString], args: argparse.Namespace, **kwargs: Any) -> List[LineString]:
+    def apply(self, lines: List[LineString], args: argparse.Namespace,
+              **kwargs: Any) -> List[LineString]:
         ...
 
 
@@ -230,17 +244,30 @@ def _ensure_geom(shape):
 
 # === MODIFICATION PLUGINS ===
 
+
 @register_modification("image_mask")
 class ImageMaskMod:
+
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--mask-image", default=None, help="Optional image to modulate fill").completer = argcomplete.completers.FilesCompleter(allowednames=(".png", ".jpg", ".jpeg"))
-        group.add_argument("--threshold", type=float, default=0.5, help="Darkness cutoff")
+        group.add_argument("--mask-image",
+                           default=None,
+                           help="Optional image to modulate fill"
+                          ).completer = argcomplete.completers.FilesCompleter(
+                              allowednames=(".png", ".jpg", ".jpeg"))
+        group.add_argument("--threshold",
+                           type=float,
+                           default=0.5,
+                           help="Darkness cutoff")
 
     def is_active(self, args: argparse.Namespace) -> bool:
         return bool(getattr(args, 'mask_image', None))
 
-    def apply(self, lines: List[LineString], args: argparse.Namespace, mask_sampler: Optional[ImageSampler] = None, **kwargs: Any) -> List[LineString]:
+    def apply(self,
+              lines: List[LineString],
+              args: argparse.Namespace,
+              mask_sampler: Optional[ImageSampler] = None,
+              **kwargs: Any) -> List[LineString]:
         if not mask_sampler:
             return lines
 
@@ -272,18 +299,30 @@ class ImageMaskMod:
 
 @register_modification("roughen")
 class RoughenMod:
+
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--roughen-amp", type=float, default=0.0, help="Amplitude of hand-drawn noise")
-        group.add_argument("--roughen-step", type=float, default=1.0, help="Resolution of hand-drawn noise")
+        group.add_argument("--roughen-amp",
+                           type=float,
+                           default=0.0,
+                           help="Amplitude of hand-drawn noise")
+        group.add_argument("--roughen-step",
+                           type=float,
+                           default=1.0,
+                           help="Resolution of hand-drawn noise")
 
     def is_active(self, args: argparse.Namespace) -> bool:
         return getattr(args, 'roughen_amp', 0.0) > 0.0
 
-    def apply(self, lines: List[LineString], args: argparse.Namespace, **kwargs: Any) -> List[LineString]:
-        return [self._roughen_line(line, args.roughen_step, args.roughen_amp) for line in lines]
+    def apply(self, lines: List[LineString], args: argparse.Namespace,
+              **kwargs: Any) -> List[LineString]:
+        return [
+            self._roughen_line(line, args.roughen_step, args.roughen_amp)
+            for line in lines
+        ]
 
-    def _roughen_line(self, line: LineString, segment_length: float, amplitude: float) -> LineString:
+    def _roughen_line(self, line: LineString, segment_length: float,
+                      amplitude: float) -> LineString:
         if line.length <= segment_length:
             return line
 
@@ -318,14 +357,23 @@ class RoughenMod:
 
 @register_modification("fisheye")
 class FisheyeMod:
+
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--fisheye", type=float, default=0.0, help="Apply radial distortion")
+        group.add_argument("--fisheye",
+                           type=float,
+                           default=0.0,
+                           help="Apply radial distortion")
 
     def is_active(self, args: argparse.Namespace) -> bool:
         return getattr(args, 'fisheye', 0.0) != 0.0
 
-    def apply(self, lines: List[LineString], args: argparse.Namespace, centroid: Any = None, max_r: float = 0.0, **kwargs: Any) -> List[LineString]:
+    def apply(self,
+              lines: List[LineString],
+              args: argparse.Namespace,
+              centroid: Any = None,
+              max_r: float = 0.0,
+              **kwargs: Any) -> List[LineString]:
         if not centroid or max_r <= 0:
             return lines
 
@@ -355,51 +403,67 @@ class FisheyeMod:
 
 # === BUILT-IN FILL PLUGINS ===
 
+
 @register_fill("concentric")
 class ConcentricFill:
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
             "--ring-simplify",
             type=float,
             default=0.2,
-            help="Simplification tolerance specific to inner rings (default: 0.2)")
+            help=
+            "Simplification tolerance specific to inner rings (default: 0.2)")
 
-    def generate(self, shape: BaseGeometry, spacing: float,
-                 ring_simplify: float = 0.2, **kwargs: Any) -> List[LineString]:
+    def generate(self,
+                 shape: BaseGeometry,
+                 spacing: float,
+                 ring_simplify: float = 0.2,
+                 **kwargs: Any) -> List[LineString]:
         lines = []
-        current_geom = shape.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
+        current_geom = shape.buffer(-spacing).simplify(ring_simplify,
+                                                       preserve_topology=False)
 
         while not current_geom.is_empty and current_geom.area > 0:
-            polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
+            polygons = [current_geom
+                       ] if current_geom.geom_type == 'Polygon' else list(
+                           current_geom.geoms)
             for p in polygons:
                 if p.exterior:
                     lines.append(LineString(p.exterior.coords))
                 for interior in p.interiors:
                     lines.append(LineString(interior.coords))
-            current_geom = current_geom.buffer(-spacing).simplify(ring_simplify, preserve_topology=False)
+            current_geom = current_geom.buffer(-spacing).simplify(
+                ring_simplify, preserve_topology=False)
 
         return lines
 
+
 @register_fill("zigzag")
 class ZigZagFill:
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        pass 
+        pass
 
-    def generate(self, shape: BaseGeometry, spacing: float, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, spacing: float,
+                 **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         y = miny + spacing
         lines = []
         left_to_right = True
 
         while y <= maxy:
-            x_start, x_end = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
+            x_start, x_end = (minx - 1,
+                              maxx + 1) if left_to_right else (maxx + 1,
+                                                               minx - 1)
             lines.append(LineString([(x_start, y), (x_end, y)]))
             y += spacing
             left_to_right = not left_to_right
 
         return lines
+
 
 @register_fill("photo-contour")
 class PhotoContourFill:
@@ -407,29 +471,31 @@ class PhotoContourFill:
 
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--image", 
-            default=None, 
-            help="Input image for contouring"
-        ).completer = argcomplete.completers.FilesCompleter(allowednames=(".png", ".jpg", ".jpeg"))
-        
+        parser.add_argument("--image",
+                            default=None,
+                            help="Input image for contouring"
+                           ).completer = argcomplete.completers.FilesCompleter(
+                               allowednames=(".png", ".jpg", ".jpeg"))
+
         parser.add_argument(
             "--levels",
             type=int,
             default=1,
-            help="Number of contour levels to extract from the image (default: 15)"
-        )
+            help=
+            "Number of contour levels to extract from the image (default: 15)")
         parser.add_argument(
             "--resolution",
             type=float,
             default=0.5,
-            help="Sampling resolution in physical units. Lower is more detailed but slower. (default: 0.5)"
+            help=
+            "Sampling resolution in physical units. Lower is more detailed but slower. (default: 0.5)"
         )
         parser.add_argument(
             "--min-length",
             type=float,
             default=2.0,
-            help="Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
+            help=
+            "Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
         )
 
     def generate(self,
@@ -439,9 +505,11 @@ class PhotoContourFill:
                  resolution: float = 0.5,
                  min_length: float = 2.0,
                  **kwargs: Any) -> List[LineString]:
-        
+
         if not sampler:
-            print("Warning: 'photo-contour' requires an --image argument. Returning empty fill.")
+            print(
+                "Warning: 'photo-contour' requires an --image argument. Returning empty fill."
+            )
             return []
 
         minx, miny, maxx, maxy = shape.bounds
@@ -490,7 +558,10 @@ class PenConfig:
 
 
 class PenTool:
-    def __init__(self, config: PenConfig, output_filename: str = "output.nc") -> None:
+
+    def __init__(self,
+                 config: PenConfig,
+                 output_filename: str = "output.nc") -> None:
         self.g = GCodeBuilder(output=output_filename)
         self.config = config
         self.current_z: Optional[float] = None
@@ -499,7 +570,8 @@ class PenTool:
         self._build_preamble()
         return self
 
-    def __exit__(self, exc_type: type, exc_val: Exception, exc_tb: type) -> None:
+    def __exit__(self, exc_type: type, exc_val: Exception,
+                 exc_tb: type) -> None:
         self.tool_off(clearance=True)
         self._build_postamble()
         self.g.flush()
@@ -533,7 +605,9 @@ class PenTool:
             self.g.rapid(z=target_z)
             self.current_z = target_z
 
-    def draw_path(self, points: List[Tuple[float, float]], clearance: bool = False) -> None:
+    def draw_path(self,
+                  points: List[Tuple[float, float]],
+                  clearance: bool = False) -> None:
         if not points:
             return
         self.move_to(*points[0], clearance=clearance)
@@ -544,15 +618,31 @@ class PenTool:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate CNC G-code from a DXF file using a pen tool.")
-    
+    parser = argparse.ArgumentParser(
+        description="Generate CNC G-code from a DXF file using a pen tool.")
+
     # Core settings (Main Parser)
-    parser.add_argument("dxf_file", help="Path to the input DXF file").completer = argcomplete.completers.FilesCompleter(allowednames=(".dxf",))
-    parser.add_argument("-o", "--output", default=None, help="Output G-code filename")
-    parser.add_argument("--feed", type=float, default=1200.0, help="Drawing feed rate (default: 1200.0)")
-    parser.add_argument("--no-optimize", action="store_true", help="Disable optimize algorithm")
-    parser.add_argument("--outline-simplify", type=float, default=0.0, help="Simplification tolerance for outlines")
-    parser.add_argument("--no-outline", action="store_true", help="Disable drawing original DXF paths")
+    parser.add_argument(
+        "dxf_file", help="Path to the input DXF file"
+    ).completer = argcomplete.completers.FilesCompleter(allowednames=(".dxf",))
+    parser.add_argument("-o",
+                        "--output",
+                        default=None,
+                        help="Output G-code filename")
+    parser.add_argument("--feed",
+                        type=float,
+                        default=1200.0,
+                        help="Drawing feed rate (default: 1200.0)")
+    parser.add_argument("--no-optimize",
+                        action="store_true",
+                        help="Disable optimize algorithm")
+    parser.add_argument("--outline-simplify",
+                        type=float,
+                        default=0.0,
+                        help="Simplification tolerance for outlines")
+    parser.add_argument("--no-outline",
+                        action="store_true",
+                        help="Disable drawing original DXF paths")
 
     # Modifications (Main Parser)
     mod_group = parser.add_argument_group("Path Modifications (Plugins)")
@@ -560,15 +650,26 @@ def parse_args() -> argparse.Namespace:
         mod_class.setup_cli(mod_group)
 
     # Fills (Subparsers)
-    subparsers = parser.add_subparsers(dest="pattern", help="Specify a fill pattern to enable infill.")
+    subparsers = parser.add_subparsers(
+        dest="pattern", help="Specify a fill pattern to enable infill.")
     for name, plugin_class in FILL_REGISTRY.items():
-        pattern_parser = subparsers.add_parser(name, help=f"Use the {name} fill pattern.")
-        
+        pattern_parser = subparsers.add_parser(
+            name, help=f"Use the {name} fill pattern.")
+
         # General fill arguments
-        pattern_parser.add_argument("--spacing", type=float, default=1.0, help="Distance between fill lines")
-        pattern_parser.add_argument("--angle", type=float, default=0.0, help="Angle of fill in degrees")
-        pattern_parser.add_argument("--simplify", type=float, default=0.0, help="Simplification tolerance for fill")
-        
+        pattern_parser.add_argument("--spacing",
+                                    type=float,
+                                    default=1.0,
+                                    help="Distance between fill lines")
+        pattern_parser.add_argument("--angle",
+                                    type=float,
+                                    default=0.0,
+                                    help="Angle of fill in degrees")
+        pattern_parser.add_argument("--simplify",
+                                    type=float,
+                                    default=0.0,
+                                    help="Simplification tolerance for fill")
+
         # Fill-specific arguments (like --image for photo-contour)
         plugin_class.setup_cli(pattern_parser)
 
@@ -613,7 +714,7 @@ def main() -> None:
     closed_polys: List[Polygon] = []
 
     with PenTool(config, output_filename=args.output) as pen:
-        
+
         # --- OUTLINE DRAWING ---
         for pts in paths_to_draw:
             if not args.no_outline:
@@ -623,7 +724,8 @@ def main() -> None:
                 dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
                 if math.hypot(dx, dy) < 0.01:
                     poly = Polygon(pts)
-                    poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
+                    poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(
+                        0)
                     if poly.area > 0:
                         closed_polys.append(poly)
 
@@ -634,51 +736,67 @@ def main() -> None:
 
             if fill_class:
                 filler = fill_class()
-                
+
                 # Setup base geometry constraints
                 poly = _ensure_geom(combined_geom)
                 if not poly.is_empty and poly.area > 0:
                     centroid = poly.centroid
                     angle = getattr(args, 'angle', 0.0)
-                    
-                    working_poly = affinity.rotate(poly, -angle, origin=centroid) if angle != 0.0 else poly
+
+                    working_poly = affinity.rotate(
+                        poly, -angle, origin=centroid) if angle != 0.0 else poly
                     global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
-                    max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
-                    
+                    max_r = math.hypot(global_maxx - global_minx,
+                                       global_maxy - global_miny) / 2.0
+
                     fill_img_path = getattr(args, 'image', None)
-                    fill_sampler = ImageSampler(fill_img_path, working_poly.bounds) if fill_img_path else None
-                    
+                    fill_sampler = ImageSampler(
+                        fill_img_path,
+                        working_poly.bounds) if fill_img_path else None
+
                     mask_img_path = getattr(args, 'mask_image', None)
-                    mask_sampler = ImageSampler(mask_img_path, working_poly.bounds) if mask_img_path else None
+                    mask_sampler = ImageSampler(
+                        mask_img_path,
+                        working_poly.bounds) if mask_img_path else None
 
                     # 1. Generate base lines
                     lines = []
-                    polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
+                    polygons = [
+                        working_poly
+                    ] if working_poly.geom_type == 'Polygon' else list(
+                        working_poly.geoms)
                     for p in polygons:
-                        lines.extend(filler.generate(p, sampler=fill_sampler, **vars(args)))
+                        lines.extend(
+                            filler.generate(p,
+                                            sampler=fill_sampler,
+                                            **vars(args)))
 
                     lines = [line for line in lines if not line.is_empty]
 
                     # 2. Apply Modification Plugins (Hardcoded execution order)
-                    hardcoded_mod_pipeline = ["image_mask", "roughen", "fisheye"]
-                    
+                    hardcoded_mod_pipeline = [
+                        "image_mask", "roughen", "fisheye"
+                    ]
+
                     for mod_name in hardcoded_mod_pipeline:
                         mod_class = MODIFICATION_REGISTRY.get(mod_name)
                         if mod_class:
                             mod = mod_class()
                             if mod.is_active(args):
-                                lines = mod.apply(
-                                    lines=lines, 
-                                    args=args, 
-                                    mask_sampler=mask_sampler, 
-                                    centroid=centroid, 
-                                    max_r=max_r
-                                )
+                                lines = mod.apply(lines=lines,
+                                                  args=args,
+                                                  mask_sampler=mask_sampler,
+                                                  centroid=centroid,
+                                                  max_r=max_r)
 
                     # 3. Core Geometric Filters (Clipping & Transform)
                     lines = apply_clipping(lines, boundary=working_poly)
-                    lines = apply_transform(lines, angle=angle, origin=centroid, simplify_tol=getattr(args, 'simplify', 0.0))
-                    
+                    lines = apply_transform(lines,
+                                            angle=angle,
+                                            origin=centroid,
+                                            simplify_tol=getattr(
+                                                args, 'simplify', 0.0))
+
                     final_lines = lines
                 else:
                     final_lines = []
@@ -687,7 +805,9 @@ def main() -> None:
 
                 if not args.no_optimize and raw_fill_coords:
                     print(f"Optimizing {args.pattern} fill paths...")
-                    last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+                    last_pos = (
+                        0.0,
+                        0.0) if not paths_to_draw else paths_to_draw[-1][-1]
                     raw_fill_coords = optimize_paths_nearest_neighbor(
                         raw_fill_coords, start_pt=last_pos)
 
@@ -701,6 +821,7 @@ def main() -> None:
         print(f"\nCould not count lines in output file: {e}")
 
     print(f"G-code successfully saved to {args.output}")
+
 
 if __name__ == "__main__":
     main()
