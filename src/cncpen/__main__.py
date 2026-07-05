@@ -14,6 +14,7 @@ from typing import Any, Callable, List, Optional, Protocol, Tuple, Union
 
 import argcomplete
 import ezdxf
+import numpy as np
 from ezdxf.path import make_path
 from gscrib import GCodeBuilder
 from PIL import Image
@@ -21,9 +22,7 @@ from shapely import affinity
 from shapely.geometry import LineString, MultiLineString, Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
-
-# Define a type alias for our pipeline filters
-PathFilter = Callable[[List[LineString]], List[LineString]]
+from skimage import measure
 
 class DXFReadError(Exception):
     """Raised when a DXF file cannot be successfully read or parsed."""
@@ -72,6 +71,7 @@ def extract_dxf_paths(
 
     return paths
 
+
 def optimize_paths_nearest_neighbor(
     paths: List[List[Tuple[float, float]]],
     start_pt: Tuple[float, float] = (0.0, 0.0)
@@ -118,39 +118,6 @@ def optimize_paths_nearest_neighbor(
 
     return optimized
 
-def roughen_line(line: LineString,
-                 segment_length: float = 1.0,
-                 amplitude: float = 0.2) -> LineString:
-    if line.length <= segment_length:
-        return line
-
-    num_segments = max(1, int(math.ceil(line.length / segment_length)))
-    points = [
-        line.interpolate(i / num_segments, normalized=True).coords[0]
-        for i in range(num_segments + 1)
-    ]
-
-    if len(points) < 3:
-        return line
-
-    wiggled_coords = [points[0]]
-    for i in range(1, len(points) - 1):
-        px, py = points[i - 1]
-        nx, ny = points[i + 1]
-        dx, dy = nx - px, ny - py
-        length = math.hypot(dx, dy)
-
-        if length == 0:
-            wiggled_coords.append(points[i])
-            continue
-
-        norm_x, norm_y = -dy / length, dx / length
-        displacement = random.gauss(0, amplitude)
-        wiggled_coords.append((points[i][0] + norm_x * displacement,
-                               points[i][1] + norm_y * displacement))
-
-    wiggled_coords.append(points[-1])
-    return LineString(wiggled_coords)
 
 def _extract_lines(geometry: BaseGeometry) -> List[LineString]:
     if geometry.is_empty:
@@ -163,66 +130,6 @@ def _extract_lines(geometry: BaseGeometry) -> List[LineString]:
         return [g for g in geometry.geoms if g.geom_type == 'LineString']
     return []
 
-def apply_image_mask(lines: List[LineString], sampler: Any,
-                     threshold: float) -> List[LineString]:
-    masked_lines = []
-    step_res = 1.0
-
-    for line in lines:
-        length = line.length
-        if length == 0:
-            continue
-
-        steps = max(2, int(math.ceil(length / step_res)))
-        current_segment = []
-
-        for i in range(steps + 1):
-            pt = line.interpolate(i / steps, normalized=True)
-            if sampler.get_darkness(pt.x, pt.y) > threshold:
-                current_segment.append((pt.x, pt.y))
-            else:
-                if len(current_segment) > 1:
-                    masked_lines.append(LineString(current_segment))
-                current_segment = []
-
-        if len(current_segment) > 1:
-            masked_lines.append(LineString(current_segment))
-
-    return masked_lines
-
-def apply_roughening(lines: List[LineString], amplitude: float,
-                     step: float) -> List[LineString]:
-    if amplitude <= 0.0:
-        return lines
-    return [roughen_line(line, step, amplitude) for line in lines]
-
-def apply_fisheye(lines: List[LineString], factor: float, centroid: Any,
-                  max_r: float) -> List[LineString]:
-    if factor == 0.0 or max_r <= 0:
-        return lines
-
-    distorted_lines = []
-    for line in lines:
-        length = line.length
-        if length == 0:
-            continue
-
-        num_segments = max(2, int(math.ceil(length / 0.5)))
-        points = [
-            line.interpolate(i / num_segments, normalized=True).coords[0]
-            for i in range(num_segments + 1)
-        ]
-
-        warped_coords = []
-        for px, py in points:
-            dx, dy = px - centroid.x, py - centroid.y
-            r = math.hypot(dx, dy)
-            f = 1.0 + factor * ((r / max_r)**2) if r > 0 else 1.0
-            warped_coords.append((centroid.x + dx * f, centroid.y + dy * f))
-
-        distorted_lines.append(LineString(warped_coords))
-
-    return distorted_lines
 
 def apply_clipping(lines: List[LineString],
                    boundary: BaseGeometry) -> List[LineString]:
@@ -235,6 +142,7 @@ def apply_clipping(lines: List[LineString],
         clipped_lines.extend(_extract_lines(intersection))
 
     return clipped_lines
+
 
 def apply_transform(lines: List[LineString], angle: float, origin: Any,
                     simplify_tol: float) -> List[LineString]:
@@ -250,13 +158,30 @@ def apply_transform(lines: List[LineString], angle: float, origin: Any,
 
     return transformed_lines
 
+
+# === REGISTRIES & CORE PROTOCOLS ===
+
 FILL_REGISTRY = {}
+MODIFICATION_REGISTRY = {}
+
 
 def register_fill(name):
     def decorator(cls):
         FILL_REGISTRY[name] = cls
         return cls
     return decorator
+
+
+def register_modification(name, priority: int = 50):
+    """
+    Priority determines the order of execution in the pipeline.
+    Lower numbers are executed first (e.g., 10 executes before 50).
+    """
+    def decorator(cls):
+        MODIFICATION_REGISTRY[name] = (cls, priority)
+        return cls
+    return decorator
+
 
 class ImageSampler:
     def __init__(self, image_path: str, bounds: tuple):
@@ -279,6 +204,7 @@ class ImageSampler:
                     (self.img.height - 1)), self.img.height - 1))
         return (255 - self.img.getpixel((px, py))) / 255.0
 
+
 class FillPattern(Protocol):
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
@@ -287,12 +213,151 @@ class FillPattern(Protocol):
     def generate(self, shape: BaseGeometry, **kwargs: Any) -> List[LineString]:
         ...
 
+
+class PathModification(Protocol):
+    @classmethod
+    def setup_cli(cls, parser: argparse._ArgumentGroup) -> None:
+        ...
+
+    def is_active(self, args: argparse.Namespace) -> bool:
+        ...
+
+    def apply(self, lines: List[LineString], args: argparse.Namespace, **kwargs: Any) -> List[LineString]:
+        ...
+
+
 def _ensure_geom(shape):
     poly = shape if isinstance(shape, BaseGeometry) else (
         Polygon() if len(shape) < 4 else Polygon(shape))
     return poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
 
-# === BUILT-IN PLUGINS ===
+
+# === MODIFICATION PLUGINS ===
+
+@register_modification("image_mask", priority=10)
+class ImageMaskMod:
+    @classmethod
+    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
+        group.add_argument("--mask-image", default=None, help="Optional image to modulate fill").completer = argcomplete.completers.FilesCompleter(allowednames=(".png", ".jpg", ".jpeg"))
+        group.add_argument("--threshold", type=float, default=0.5, help="Darkness cutoff")
+
+    def is_active(self, args: argparse.Namespace) -> bool:
+        return bool(getattr(args, 'mask_image', None))
+
+    def apply(self, lines: List[LineString], args: argparse.Namespace, mask_sampler: Optional[ImageSampler] = None, **kwargs: Any) -> List[LineString]:
+        if not mask_sampler:
+            return lines
+
+        masked_lines = []
+        step_res = 1.0
+
+        for line in lines:
+            length = line.length
+            if length == 0:
+                continue
+
+            steps = max(2, int(math.ceil(length / step_res)))
+            current_segment = []
+
+            for i in range(steps + 1):
+                pt = line.interpolate(i / steps, normalized=True)
+                if mask_sampler.get_darkness(pt.x, pt.y) > args.threshold:
+                    current_segment.append((pt.x, pt.y))
+                else:
+                    if len(current_segment) > 1:
+                        masked_lines.append(LineString(current_segment))
+                    current_segment = []
+
+            if len(current_segment) > 1:
+                masked_lines.append(LineString(current_segment))
+
+        return masked_lines
+
+
+@register_modification("roughen", priority=20)
+class RoughenMod:
+    @classmethod
+    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
+        group.add_argument("--roughen-amp", type=float, default=0.0, help="Amplitude of hand-drawn noise")
+        group.add_argument("--roughen-step", type=float, default=1.0, help="Resolution of hand-drawn noise")
+
+    def is_active(self, args: argparse.Namespace) -> bool:
+        return getattr(args, 'roughen_amp', 0.0) > 0.0
+
+    def apply(self, lines: List[LineString], args: argparse.Namespace, **kwargs: Any) -> List[LineString]:
+        return [self._roughen_line(line, args.roughen_step, args.roughen_amp) for line in lines]
+
+    def _roughen_line(self, line: LineString, segment_length: float, amplitude: float) -> LineString:
+        if line.length <= segment_length:
+            return line
+
+        num_segments = max(1, int(math.ceil(line.length / segment_length)))
+        points = [
+            line.interpolate(i / num_segments, normalized=True).coords[0]
+            for i in range(num_segments + 1)
+        ]
+
+        if len(points) < 3:
+            return line
+
+        wiggled_coords = [points[0]]
+        for i in range(1, len(points) - 1):
+            px, py = points[i - 1]
+            nx, ny = points[i + 1]
+            dx, dy = nx - px, ny - py
+            length = math.hypot(dx, dy)
+
+            if length == 0:
+                wiggled_coords.append(points[i])
+                continue
+
+            norm_x, norm_y = -dy / length, dx / length
+            displacement = random.gauss(0, amplitude)
+            wiggled_coords.append((points[i][0] + norm_x * displacement,
+                                   points[i][1] + norm_y * displacement))
+
+        wiggled_coords.append(points[-1])
+        return LineString(wiggled_coords)
+
+
+@register_modification("fisheye", priority=30)
+class FisheyeMod:
+    @classmethod
+    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
+        group.add_argument("--fisheye", type=float, default=0.0, help="Apply radial distortion")
+
+    def is_active(self, args: argparse.Namespace) -> bool:
+        return getattr(args, 'fisheye', 0.0) != 0.0
+
+    def apply(self, lines: List[LineString], args: argparse.Namespace, centroid: Any = None, max_r: float = 0.0, **kwargs: Any) -> List[LineString]:
+        if not centroid or max_r <= 0:
+            return lines
+
+        distorted_lines = []
+        for line in lines:
+            length = line.length
+            if length == 0:
+                continue
+
+            num_segments = max(2, int(math.ceil(length / 0.5)))
+            points = [
+                line.interpolate(i / num_segments, normalized=True).coords[0]
+                for i in range(num_segments + 1)
+            ]
+
+            warped_coords = []
+            for px, py in points:
+                dx, dy = px - centroid.x, py - centroid.y
+                r = math.hypot(dx, dy)
+                f = 1.0 + args.fisheye * ((r / max_r)**2) if r > 0 else 1.0
+                warped_coords.append((centroid.x + dx * f, centroid.y + dy * f))
+
+            distorted_lines.append(LineString(warped_coords))
+
+        return distorted_lines
+
+
+# === BUILT-IN FILL PLUGINS ===
 
 @register_fill("concentric")
 class ConcentricFill:
@@ -340,6 +405,85 @@ class ZigZagFill:
 
         return lines
 
+@register_fill("photo-contour")
+class PhotoContourFill:
+    """Generates topographic contours driven by image darkness."""
+
+    @classmethod
+    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--image", 
+            default=None, 
+            help="Input image for contouring"
+        ).completer = argcomplete.completers.FilesCompleter(allowednames=(".png", ".jpg", ".jpeg"))
+        
+        parser.add_argument(
+            "--levels",
+            type=int,
+            default=1,
+            help="Number of contour levels to extract from the image (default: 15)"
+        )
+        parser.add_argument(
+            "--resolution",
+            type=float,
+            default=0.5,
+            help="Sampling resolution in physical units. Lower is more detailed but slower. (default: 0.5)"
+        )
+        parser.add_argument(
+            "--min-length",
+            type=float,
+            default=2.0,
+            help="Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
+        )
+
+    def generate(self,
+                 shape: BaseGeometry,
+                 sampler: ImageSampler = None,
+                 levels: int = 1,
+                 resolution: float = 0.5,
+                 min_length: float = 2.0,
+                 **kwargs: Any) -> List[LineString]:
+        
+        if not sampler:
+            print("Warning: 'photo-contour' requires an --image argument. Returning empty fill.")
+            return []
+
+        minx, miny, maxx, maxy = shape.bounds
+        width = maxx - minx
+        height = maxy - miny
+
+        res_x = max(2, int(width / resolution))
+        res_y = max(2, int(height / resolution))
+
+        grid = np.zeros((res_y, res_x))
+        for i in range(res_y):
+            py = miny + (i / (res_y - 1)) * height
+            for j in range(res_x):
+                px = minx + (j / (res_x - 1)) * width
+                grid[i, j] = sampler.get_darkness(px, py)
+
+        lines = []
+        thresholds = np.linspace(0.05, 0.95, levels)
+
+        for level in thresholds:
+            contours = measure.find_contours(grid, level)
+
+            for contour in contours:
+                coords = []
+                for pt in contour:
+                    y_idx, x_idx = pt[0], pt[1]
+                    px = minx + (x_idx / (res_x - 1)) * width
+                    py = miny + (y_idx / (res_y - 1)) * height
+                    coords.append((px, py))
+
+                if len(coords) >= 2:
+                    line = LineString(coords)
+
+                    if line.length >= min_length:
+                        lines.append(line)
+
+        return lines
+
 
 @dataclass
 class PenConfig:
@@ -347,6 +491,7 @@ class PenConfig:
     rapid_z: float = 1.0
     feed_rate: float = 400.0
     down_z: float = -1.0
+
 
 class PenTool:
     def __init__(self, config: PenConfig, output_filename: str = "output.nc") -> None:
@@ -405,25 +550,30 @@ class PenTool:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate CNC G-code from a DXF file using a pen tool.")
     
+    # Core settings (Main Parser)
     parser.add_argument("dxf_file", help="Path to the input DXF file").completer = argcomplete.completers.FilesCompleter(allowednames=(".dxf",))
     parser.add_argument("-o", "--output", default=None, help="Output G-code filename")
     parser.add_argument("--feed", type=float, default=1200.0, help="Drawing feed rate (default: 1200.0)")
     parser.add_argument("--no-optimize", action="store_true", help="Disable optimize algorithm")
     parser.add_argument("--outline-simplify", type=float, default=0.0, help="Simplification tolerance for outlines")
     parser.add_argument("--no-outline", action="store_true", help="Disable drawing original DXF paths")
-    parser.add_argument("--roughen-amp", type=float, default=0.0, help="Amplitude of hand-drawn noise")
-    parser.add_argument("--roughen-step", type=float, default=1.0, help="Resolution of hand-drawn noise")
 
+    # Modifications (Main Parser)
+    mod_group = parser.add_argument_group("Path Modifications (Plugins)")
+    for mod_name, (mod_class, _) in MODIFICATION_REGISTRY.items():
+        mod_class.setup_cli(mod_group)
+
+    # Fills (Subparsers)
     subparsers = parser.add_subparsers(dest="pattern", help="Specify a fill pattern to enable infill.")
-
     for name, plugin_class in FILL_REGISTRY.items():
         pattern_parser = subparsers.add_parser(name, help=f"Use the {name} fill pattern.")
-        pattern_parser.add_argument("--image", default=None, help="Optional image to modulate fill").completer = argcomplete.completers.FilesCompleter(allowednames=(".png", ".jpg", ".jpeg"))
-        pattern_parser.add_argument("--threshold", type=float, default=0.5, help="Darkness cutoff")
+        
+        # General fill arguments
         pattern_parser.add_argument("--spacing", type=float, default=1.0, help="Distance between fill lines")
         pattern_parser.add_argument("--angle", type=float, default=0.0, help="Angle of fill in degrees")
-        pattern_parser.add_argument("--fisheye", type=float, default=0.0, help="Apply radial distortion")
         pattern_parser.add_argument("--simplify", type=float, default=0.0, help="Simplification tolerance for fill")
+        
+        # Fill-specific arguments (like --image for photo-contour)
         plugin_class.setup_cli(pattern_parser)
 
     argcomplete.autocomplete(parser)
@@ -493,39 +643,42 @@ def main() -> None:
                 poly = _ensure_geom(combined_geom)
                 if not poly.is_empty and poly.area > 0:
                     centroid = poly.centroid
-                    angle = args.angle
+                    angle = getattr(args, 'angle', 0.0)
                     
                     working_poly = affinity.rotate(poly, -angle, origin=centroid) if angle != 0.0 else poly
                     global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
                     max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
                     
-                    sampler = ImageSampler(args.image, working_poly.bounds) if args.image else None
+                    fill_img_path = getattr(args, 'image', None)
+                    fill_sampler = ImageSampler(fill_img_path, working_poly.bounds) if fill_img_path else None
+                    
+                    mask_img_path = getattr(args, 'mask_image', None)
+                    mask_sampler = ImageSampler(mask_img_path, working_poly.bounds) if mask_img_path else None
 
                     # 1. Generate base lines
                     lines = []
                     polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
                     for p in polygons:
-                        lines.extend(filler.generate(p, sampler=sampler, **vars(args)))
+                        lines.extend(filler.generate(p, sampler=fill_sampler, **vars(args)))
 
                     lines = [line for line in lines if not line.is_empty]
 
-                    # 2. Declare the declarative filter pipeline
-                    needs_mask = sampler and not getattr(filler, 'handles_image_natively', False)
-                    roughen_amp = getattr(args, 'roughen_amp', 0.0)
-                    fisheye = getattr(args, 'fisheye', 0.0)
-                    
-                    pipeline: List[Optional[PathFilter]] = [
-                        partial(apply_image_mask, sampler=sampler, threshold=args.threshold) if needs_mask else None,
-                        partial(apply_roughening, amplitude=roughen_amp, step=args.roughen_step) if roughen_amp > 0.0 else None,
-                        partial(apply_fisheye, factor=fisheye, centroid=centroid, max_r=max_r) if fisheye != 0.0 else None,
-                        partial(apply_clipping, boundary=working_poly),
-                        partial(apply_transform, angle=angle, origin=centroid, simplify_tol=getattr(args, 'simplify', 0.0))
-                    ]
+                    # 2. Apply Dynamic Modification Plugins
+                    sorted_mods = sorted(MODIFICATION_REGISTRY.values(), key=lambda x: x[1])
+                    for mod_class, _ in sorted_mods:
+                        mod = mod_class()
+                        if mod.is_active(args):
+                            lines = mod.apply(
+                                lines=lines, 
+                                args=args, 
+                                mask_sampler=mask_sampler, 
+                                centroid=centroid, 
+                                max_r=max_r
+                            )
 
-                    # 3. Execute active filters sequentially
-                    active_filters = filter(None, pipeline)
-                    for apply_filter in active_filters:
-                        lines = apply_filter(lines)
+                    # 3. Core Geometric Filters (Clipping & Transform)
+                    lines = apply_clipping(lines, boundary=working_poly)
+                    lines = apply_transform(lines, angle=angle, origin=centroid, simplify_tol=getattr(args, 'simplify', 0.0))
                     
                     final_lines = lines
                 else:
