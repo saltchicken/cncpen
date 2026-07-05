@@ -1,6 +1,7 @@
 import argparse
 import importlib
 import os
+import yaml
 import pkgutil
 from typing import Any
 
@@ -29,60 +30,35 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate CNC G-code from a DXF file using a pen tool.")
 
-    # Core settings (Main Parser)
-    parser.add_argument(
-        "dxf_file", help="Path to the input DXF file"
+    # Core settings
+    parser.add_argument("dxf_file", help="Path to the input DXF file"
     ).completer = argcomplete.completers.FilesCompleter(allowednames=(".dxf",))
-    parser.add_argument("-o",
-                        "--output",
-                        default=None,
-                        help="Output G-code filename")
-    parser.add_argument("--feed",
-                        type=float,
-                        default=1200.0,
-                        help="Drawing feed rate (default: 1200.0)")
-    parser.add_argument("--no-optimize",
-                        action="store_true",
-                        help="Disable optimize algorithm")
-    parser.add_argument("--outline-simplify",
-                        type=float,
-                        default=0.0,
-                        help="Simplification tolerance for outlines")
-    parser.add_argument("--no-outline",
-                        action="store_true",
-                        help="Disable drawing original DXF paths")
+    
+    parser.add_argument("-c", "--config", 
+                        required=True, 
+                        help="Path to YAML job configuration file"
+    ).completer = argcomplete.completers.FilesCompleter(allowednames=(".yaml", ".yml"))
 
-    # Modifications (Main Parser)
+    parser.add_argument("-o", "--output", default=None, help="Output G-code filename")
+    parser.add_argument("--feed", type=float, default=1200.0, help="Drawing feed rate (default: 1200.0)")
+    parser.add_argument("--no-optimize", action="store_true", help="Disable optimize algorithm")
+    parser.add_argument("--outline-simplify", type=float, default=0.0, help="Simplification tolerance for outlines")
+    parser.add_argument("--no-outline", action="store_true", help="Disable drawing original DXF paths")
+
+    # Modifications (Global Modifiers)
     mod_group = parser.add_argument_group("Path Modifications (Plugins)")
     for mod_name, mod_class in MODIFICATION_REGISTRY.items():
         mod_class.setup_cli(mod_group)
 
-    # Fills (Subparsers)
-    subparsers = parser.add_subparsers(
-        dest="pattern", help="Specify a fill pattern to enable infill.")
-    for name, plugin_class in FILL_REGISTRY.items():
-        pattern_parser = subparsers.add_parser(
-            name, help=f"Use the {name} fill pattern.")
-
-        # General fill arguments
-        pattern_parser.add_argument("--spacing",
-                                    type=float,
-                                    default=2.0,
-                                    help="Distance between fill lines")
-        pattern_parser.add_argument("--angle",
-                                    type=float,
-                                    default=0.0,
-                                    help="Angle of fill in degrees")
-        pattern_parser.add_argument("--simplify",
-                                    type=float,
-                                    default=0.0,
-                                    help="Simplification tolerance for fill")
-
-        # Fill-specific arguments
-        plugin_class.setup_cli(pattern_parser)
-
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
+
+    # Load and attach the YAML config
+    try:
+        with open(args.config, 'r') as f:
+            args.job_config = yaml.safe_load(f) or {}
+    except Exception as e:
+        parser.error(f"Failed to read YAML config: {e}")
 
     if args.output is None:
         base_name = os.path.splitext(args.dxf_file)[0]

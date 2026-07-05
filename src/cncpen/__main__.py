@@ -31,17 +31,19 @@ def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
                      args: argparse.Namespace, pen: PenTool) -> List[Polygon]:
     """Draws outlines and extracts closed polygons to be used as fill boundaries."""
     closed_polys: List[Polygon] = []
+    
+    # Check if we have any fills defined in the YAML config
+    has_fills = bool(getattr(args, 'job_config', {}).get('fills'))
 
     for pts in paths_to_draw:
         if not args.no_outline:
             pen.draw_path(pts, clearance=True)
 
-        if args.pattern and len(pts) > 2:
+        if has_fills and len(pts) > 2:
             dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
             if math.hypot(dx, dy) < 0.01:
                 poly = Polygon(pts)
-                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(
-                    0)
+                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
                 if poly.area > 0:
                     closed_polys.append(poly)
 
@@ -50,82 +52,88 @@ def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
 
 def process_fills(closed_polys: List[Polygon],
                   paths_to_draw: List[List[Tuple[float, float]]],
-                  args: argparse.Namespace, pen: PenTool) -> None:
+                  args: argparse.Namespace, 
+                  fill_definitions: List[dict],
+                  pen: PenTool) -> None:
     """Handles geometry extraction, sampling, modifications, and generation for fill patterns."""
-    if not args.pattern or not closed_polys:
+    if not closed_polys or not fill_definitions:
         return
 
     try:
         combined_geom = reduce(operator.xor, closed_polys)
     except BaseException as e:
-        print(f"Warning: Failed to boolean XOR boundary polygons: {e}",
-              file=sys.stderr)
+        print(f"Warning: Failed to boolean XOR boundary polygons: {e}", file=sys.stderr)
         return
 
-    fill_class = FILL_REGISTRY.get(args.pattern)
-
-    if not fill_class:
-        return
-
-    filler = fill_class()
-
-    # Setup base geometry constraints
     poly = _ensure_geom(combined_geom)
     if poly.is_empty or poly.area <= 0:
         return
 
     centroid = poly.centroid
-    angle = getattr(args, 'angle', 0.0)
+    global_minx, global_miny, global_maxx, global_maxy = poly.bounds
+    max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
 
-    working_poly = affinity.rotate(poly, -angle,
-                                   origin=centroid) if angle != 0.0 else poly
-    global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
-    max_r = math.hypot(global_maxx - global_minx,
-                       global_maxy - global_miny) / 2.0
+    all_raw_fill_coords = []
 
-    # Initialize RenderContext for plugins
-    context = RenderContext(args=args,
-                            boundary=working_poly,
-                            centroid=centroid,
-                            max_r=max_r)
+    # --- LOOP OVER EACH FILL PASS IN THE YAML CONFIG ---
+    for fill_def in fill_definitions:
+        pattern_name = fill_def.get("pattern")
+        fill_class = FILL_REGISTRY.get(pattern_name)
 
-    # 1. Generate base lines
-    lines = []
-    polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(
-        working_poly.geoms)
-    for p in polygons:
-        lines.extend(filler.generate(p, context))
+        if not fill_class:
+            print(f"Warning: Unknown fill pattern '{pattern_name}'", file=sys.stderr)
+            continue
 
-    lines = [line for line in lines if not line.is_empty]
+        filler = fill_class()
+        angle = fill_def.get('angle', 0.0)
 
-    # 2. Clip lines against boundary (Performance: do this BEFORE modifications)
-    lines = apply_clipping(lines, boundary=working_poly)
+        # Create a combined namespace of global args + this specific fill's parameters
+        context_args = argparse.Namespace(**vars(args), **fill_def)
 
-    # 3. Apply Modification Plugins (Dynamic execution)
-    for mod_name, mod_class in MODIFICATION_REGISTRY.items():
-        mod = mod_class()
-        if mod.is_active(args):
-            lines = mod.apply(lines, context)
+        working_poly = affinity.rotate(poly, -angle, origin=centroid) if angle != 0.0 else poly
 
-    # 4. Apply clipping again AFTER modifications
-    lines = apply_clipping(lines, boundary=working_poly)
+        context = RenderContext(args=context_args,
+                                boundary=working_poly,
+                                centroid=centroid,
+                                max_r=max_r)
 
-    # 5. Transform Output (Rotation & Simplify)
-    lines = apply_transform(lines,
-                            angle=angle,
-                            origin=centroid,
-                            simplify_tol=getattr(args, 'simplify', 0.0))
+        # 1. Generate base lines
+        lines = []
+        polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
+        for p in polygons:
+            lines.extend(filler.generate(p, context))
 
-    raw_fill_coords = [list(line.coords) for line in lines]
+        lines = [line for line in lines if not line.is_empty]
 
-    # 5. Optimize and draw
-    if not args.no_optimize and raw_fill_coords:
-        print(f"Optimizing {args.pattern} fill paths...")
+        # 2. Clip lines against boundary
+        lines = apply_clipping(lines, boundary=working_poly)
+
+        # 3. Apply Modification Plugins (Dynamic execution)
+        for mod_name, mod_class in MODIFICATION_REGISTRY.items():
+            mod = mod_class()
+            if mod.is_active(context_args):
+                lines = mod.apply(lines, context)
+
+        # 4. Apply clipping again AFTER modifications
+        lines = apply_clipping(lines, boundary=working_poly)
+
+        # 5. Transform Output (Rotation & Simplify)
+        lines = apply_transform(lines,
+                                angle=angle,
+                                origin=centroid,
+                                simplify_tol=fill_def.get('simplify', 0.0))
+
+        # Accumulate coordinates for this fill layer
+        all_raw_fill_coords.extend([list(line.coords) for line in lines])
+
+    # --- OPTIMIZE ALL LAYERS TOGETHER ---
+    if not args.no_optimize and all_raw_fill_coords:
+        print(f"Optimizing {len(fill_definitions)} fill layer(s)...")
         last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
-        raw_fill_coords = optimize_paths_nearest_neighbor(raw_fill_coords,
-                                                          start_pt=last_pos)
+        all_raw_fill_coords = optimize_paths_nearest_neighbor(all_raw_fill_coords, start_pt=last_pos)
 
-    for f_pts in raw_fill_coords:
+    # --- DRAW ---
+    for f_pts in all_raw_fill_coords:
         pen.draw_path(f_pts, clearance=False)
 
 
@@ -138,6 +146,7 @@ def print_post_run_stats(output_filename: str) -> None:
         print(f"\nCould not count lines in output file: {e}")
 
     print(f"G-code successfully saved to {output_filename}")
+
 
 
 def main() -> None:
@@ -166,8 +175,14 @@ def main() -> None:
     config = PenConfig(feed_rate=args.feed)
 
     with PenTool(config, output_filename=args.output) as pen:
+        # 1. Process Outlines
         closed_polys = process_outlines(paths_to_draw, args, pen)
-        process_fills(closed_polys, paths_to_draw, args, pen)
+        
+        # 2. Extract fills array from YAML config (default to empty list if not found)
+        fill_definitions = args.job_config.get('fills', [])
+        
+        # 3. Process Fills (using the updated loop logic from Approach 1)
+        process_fills(closed_polys, paths_to_draw, args, fill_definitions, pen)
 
     print_post_run_stats(args.output)
 
