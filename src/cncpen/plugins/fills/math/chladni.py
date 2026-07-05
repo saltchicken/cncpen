@@ -17,8 +17,6 @@ class ChladniFill:
     If an image sampler is provided, it warps the resonant nodes based on the photo's darkness.
     """
 
-    handles_image_natively = True
-
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--n",

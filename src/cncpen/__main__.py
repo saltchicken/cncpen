@@ -14,6 +14,7 @@ from shapely.geometry import Polygon
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
 from cncpen import RenderContext
+from cncpen import ImageSampler
 from cncpen.cli import parse_args
 from cncpen.cli import print_run_parameters
 from cncpen.dxf import DXFReadError
@@ -81,6 +82,9 @@ def process_fills(closed_polys: List[Polygon],
     global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
     max_r = math.hypot(global_maxx - global_minx,
                        global_maxy - global_miny) / 2.0
+
+    if getattr(args, 'image', None):
+        args.sampler = ImageSampler(args.image, (global_minx, global_miny, global_maxx, global_maxy))
 
     # Initialize RenderContext for plugins
     context = RenderContext(args=args,

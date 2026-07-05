@@ -13,8 +13,6 @@ from cncpen import register_fill
 class SineFill:
     """Generates back-and-forth sine wave fill paths, optionally modulated by an image."""
 
-    handles_image_natively = True
-
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(

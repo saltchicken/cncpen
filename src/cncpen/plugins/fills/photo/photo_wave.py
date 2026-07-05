@@ -11,7 +11,6 @@ from cncpen import register_fill
 
 @register_fill("photo_wave")
 class PhotoWaveFill:
-    handles_image_natively = True
 
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
