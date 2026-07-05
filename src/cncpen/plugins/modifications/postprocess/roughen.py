@@ -7,6 +7,7 @@ import argcomplete
 from shapely.geometry import LineString
 
 from cncpen import register_modification
+from cncpen import RenderContext
 
 
 @register_modification("roughen")
@@ -26,10 +27,12 @@ class RoughenMod:
     def is_active(self, args: argparse.Namespace) -> bool:
         return getattr(args, 'roughen_amp', 0.0) > 0.0
 
-    def apply(self, lines: List[LineString], args: argparse.Namespace,
-              **kwargs: Any) -> List[LineString]:
+    def apply(self, lines: List[LineString],
+              context: RenderContext) -> List[LineString]:
+        step = context.args.roughen_step
+        amp = context.args.roughen_amp
         return [
-            self._roughen_line(line, args.roughen_step, args.roughen_amp)
+            self._roughen_line(line, step, amp)
             for line in lines
         ]
 

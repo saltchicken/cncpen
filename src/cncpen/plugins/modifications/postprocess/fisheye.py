@@ -6,6 +6,7 @@ import argcomplete
 from shapely.geometry import LineString
 
 from cncpen import register_modification
+from cncpen import RenderContext
 
 
 @register_modification("fisheye")
@@ -21,13 +22,10 @@ class FisheyeMod:
     def is_active(self, args: argparse.Namespace) -> bool:
         return getattr(args, 'fisheye', 0.0) != 0.0
 
-    def apply(self,
-              lines: List[LineString],
-              args: argparse.Namespace,
-              centroid: Any = None,
-              max_r: float = 0.0,
-              **kwargs: Any) -> List[LineString]:
-        if not centroid or max_r <= 0:
+    def apply(self, lines: List[LineString],
+              context: RenderContext) -> List[LineString]:
+        fisheye = context.args.fisheye
+        if not fisheye or context.max_r <= 0:
             return lines
 
         distorted_lines = []
@@ -44,10 +42,11 @@ class FisheyeMod:
 
             warped_coords = []
             for px, py in points:
-                dx, dy = px - centroid.x, py - centroid.y
+                dx, dy = px - context.centroid.x, py - context.centroid.y
                 r = math.hypot(dx, dy)
-                f = 1.0 + args.fisheye * ((r / max_r)**2) if r > 0 else 1.0
-                warped_coords.append((centroid.x + dx * f, centroid.y + dy * f))
+                f = 1.0 + fisheye * ((r / context.max_r)**2) if r > 0 else 1.0
+                warped_coords.append(
+                    (context.centroid.x + dx * f, context.centroid.y + dy * f))
 
             distorted_lines.append(LineString(warped_coords))
 
