@@ -24,7 +24,6 @@ from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
 
-# Import API from __init__.py
 from cncpen import FILL_REGISTRY, MODIFICATION_REGISTRY, ImageSampler
 
 class DXFReadError(Exception):
@@ -39,7 +38,6 @@ def load_plugins() -> None:
     except ImportError:
         return
 
-    # Walk through all modules in the plugins package and load them
     for _, name, is_pkg in pkgutil.walk_packages(cncpen.plugins.__path__, cncpen.plugins.__name__ + "."):
         if not is_pkg:
             importlib.import_module(name)
