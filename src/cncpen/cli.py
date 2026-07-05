@@ -44,6 +44,19 @@ def parse_args() -> argparse.Namespace:
         help="Disable drawing the original DXF paths (useful if you only want the fill pattern)."
     )
 
+    parser.add_argument(
+        "--roughen-amp",
+        type=float,
+        default=0.0,
+        help="Amplitude of the hand-drawn noise. 0.0 disables it. (default: 0.0)"
+    )
+    parser.add_argument(
+        "--roughen-step",
+        type=float,
+        default=1.0,
+        help="Resolution of the hand-drawn noise (default: 1.0)"
+    )
+
     # Subparsers for fill patterns
     subparsers = parser.add_subparsers(
         dest="pattern", 

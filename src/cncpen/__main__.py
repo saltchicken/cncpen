@@ -11,17 +11,13 @@ from shapely.geometry import Polygon
 from .cli import parse_args
 from .fills import FILL_REGISTRY, load_plugins, generate_pipeline
 from .machine import PenConfig, PenTool
-from .utils import DXFReadError, extract_dxf_paths, optimize_paths_nearest_neighbor
+from .utils import DXFReadError, extract_dxf_paths, optimize_paths_nearest_neighbor, roughen_coords
 
 
 def main() -> None:
-    # 1. Load all dynamic plugins to populate the registry
     load_plugins()
-
-    # 2. Parse arguments via isolated CLI module
     args = parse_args()
 
-    # --- NEW: Print the values of the parameters being used ---
     print("--- Run Parameters ---")
     for key, value in vars(args).items():
         print(f"{key}: {value}")
@@ -29,7 +25,6 @@ def main() -> None:
 
     print(f"Reading geometry from {args.dxf_file}...")
 
-    # 3. Handle geometry extraction with the new custom exception
     try:
         paths_to_draw = extract_dxf_paths(
             args.dxf_file,
@@ -52,61 +47,47 @@ def main() -> None:
     config = PenConfig(feed_rate=args.feed)
     closed_polys: List[Polygon] = []
 
-    # 4. Orchestrate the G-code generation
     with PenTool(config, output_filename=args.output) as pen:
         
-        # Draw all outlines and collect closed shapes
+        # --- OUTLINE DRAWING ---
         for pts in paths_to_draw:
             if not args.no_outline:
-                pen.draw_path(pts, clearance=True)
+                drawn_pts = roughen_coords(pts, args.roughen_step, args.roughen_amp) if args.roughen_amp > 0 else pts
+                pen.draw_path(drawn_pts, clearance=True)
 
-            # Collect closed shapes if a fill pattern was requested
             if args.pattern and len(pts) > 2:
-                dx = pts[0][0] - pts[-1][0]
-                dy = pts[0][1] - pts[-1][1]
-
-                # Check if path is closed (start and end points overlap)
+                dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
                 if math.hypot(dx, dy) < 0.01:
                     poly = Polygon(pts)
-                    if poly.is_valid and poly.area > 0:
+                    poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
+                    if poly.area > 0:
                         closed_polys.append(poly)
-                    else:
-                        poly = poly.buffer(0)  # Attempt to fix self-intersections
-                        if poly.area > 0:
-                            closed_polys.append(poly)
 
-        # Process Fills using the Even-Odd Rule
+        # --- FILL DRAWING ---
         if args.pattern and closed_polys:
-            # XOR all closed paths to automatically punch out holes
             combined_geom = reduce(operator.xor, closed_polys)
-
             fill_class = FILL_REGISTRY.get(args.pattern)
+            
             if fill_class:
                 filler = fill_class()
                 
-                # Delegate to the central pipeline
-                # **vars(args) will seamlessly pass 'simplify' down to the pipeline
-                fill_paths = generate_pipeline(
-                    filler, 
-                    combined_geom, 
-                    **vars(args)
-                )
+                # Retrieve final_strokes (List[PenStroke]) from FP core
+                final_strokes = generate_pipeline(filler, combined_geom, **vars(args))
+                
+                # Extract raw coordinates back for hardware shell processing
+                raw_fill_coords = [list(stroke.geometry.coords) for stroke in final_strokes]
 
                 if not args.no_optimize:
                     print(f"Optimizing {args.pattern} fill paths...")
-                    last_position = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
-                    fill_paths = optimize_paths_nearest_neighbor(
-                        fill_paths, start_pt=last_position
-                    )
+                    last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+                    raw_fill_coords = optimize_paths_nearest_neighbor(raw_fill_coords, start_pt=last_pos)
 
-                for f_pts in fill_paths:
+                for f_pts in raw_fill_coords:
                     pen.draw_path(f_pts, clearance=False)
 
-    # --- NEW: Print the total number of G-code lines produced ---
     try:
         with open(args.output, 'r') as f:
-            line_count = sum(1 for _ in f)
-        print(f"\nTotal G-code lines produced: {line_count}")
+            print(f"\nTotal G-code lines produced: {sum(1 for _ in f)}")
     except Exception as e:
         print(f"\nCould not count lines in output file: {e}")
 
