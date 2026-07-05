@@ -3,34 +3,46 @@
 
 import argparse
 from dataclasses import dataclass
-from functools import partial
 from functools import reduce
+import importlib
 import math
 import operator
 import os
 from pathlib import Path
-import random
+import pkgutil
 import sys
-from typing import Any, Callable, List, Optional, Protocol, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import argcomplete
 import ezdxf
 from ezdxf.path import make_path
 from gscrib import GCodeBuilder
-import numpy as np
-from PIL import Image
 from shapely import affinity
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
-from skimage import measure
 
+# Import API from __init__.py
+from cncpen import FILL_REGISTRY, MODIFICATION_REGISTRY, ImageSampler
 
 class DXFReadError(Exception):
     """Raised when a DXF file cannot be successfully read or parsed."""
     pass
+
+
+def load_plugins() -> None:
+    """Dynamically loads all plugins in the cncpen.plugins directory tree."""
+    try:
+        import cncpen.plugins
+    except ImportError:
+        return
+
+    # Walk through all modules in the plugins package and load them
+    for _, name, is_pkg in pkgutil.walk_packages(cncpen.plugins.__path__, cncpen.plugins.__name__ + "."):
+        if not is_pkg:
+            importlib.import_module(name)
 
 
 def extract_dxf_paths(
@@ -165,388 +177,10 @@ def apply_transform(lines: List[LineString], angle: float, origin: Any,
     return transformed_lines
 
 
-# === REGISTRIES & CORE PROTOCOLS ===
-
-FILL_REGISTRY = {}
-MODIFICATION_REGISTRY = {}
-
-
-def register_fill(name):
-
-    def decorator(cls):
-        FILL_REGISTRY[name] = cls
-        return cls
-
-    return decorator
-
-
-def register_modification(name):
-
-    def decorator(cls):
-        MODIFICATION_REGISTRY[name] = cls
-        return cls
-
-    return decorator
-
-
-class ImageSampler:
-
-    def __init__(self, image_path: str, bounds: tuple):
-        self.img = Image.open(image_path).convert("L")
-        self.minx, self.miny, self.maxx, self.maxy = bounds
-        self.width = self.maxx - self.minx
-        self.height = self.maxy - self.miny
-
-    def get_darkness(self, x: float, y: float) -> float:
-        if self.width == 0 or self.height == 0:
-            return 0.0
-        px = max(
-            0,
-            min(int(((x - self.minx) / self.width) * (self.img.width - 1)),
-                self.img.width - 1))
-        py = max(
-            0,
-            min(
-                int((1.0 - ((y - self.miny) / self.height)) *
-                    (self.img.height - 1)), self.img.height - 1))
-        return (255 - self.img.getpixel((px, py))) / 255.0
-
-
-class FillPattern(Protocol):
-
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        ...
-
-    def generate(self, shape: BaseGeometry, **kwargs: Any) -> List[LineString]:
-        ...
-
-
-class PathModification(Protocol):
-
-    @classmethod
-    def setup_cli(cls, parser: argparse._ArgumentGroup) -> None:
-        ...
-
-    def is_active(self, args: argparse.Namespace) -> bool:
-        ...
-
-    def apply(self, lines: List[LineString], args: argparse.Namespace,
-              **kwargs: Any) -> List[LineString]:
-        ...
-
-
 def _ensure_geom(shape):
     poly = shape if isinstance(shape, BaseGeometry) else (
         Polygon() if len(shape) < 4 else Polygon(shape))
     return poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
-
-
-# === MODIFICATION PLUGINS ===
-
-
-@register_modification("image_mask")
-class ImageMaskMod:
-
-    @classmethod
-    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--mask-image",
-                           default=None,
-                           help="Optional image to modulate fill"
-                          ).completer = argcomplete.completers.FilesCompleter(
-                              allowednames=(".png", ".jpg", ".jpeg"))
-        group.add_argument("--threshold",
-                           type=float,
-                           default=0.5,
-                           help="Darkness cutoff")
-
-    def is_active(self, args: argparse.Namespace) -> bool:
-        return bool(getattr(args, 'mask_image', None))
-
-    def apply(self,
-              lines: List[LineString],
-              args: argparse.Namespace,
-              mask_sampler: Optional[ImageSampler] = None,
-              **kwargs: Any) -> List[LineString]:
-        if not mask_sampler:
-            return lines
-
-        masked_lines = []
-        step_res = 1.0
-
-        for line in lines:
-            length = line.length
-            if length == 0:
-                continue
-
-            steps = max(2, int(math.ceil(length / step_res)))
-            current_segment = []
-
-            for i in range(steps + 1):
-                pt = line.interpolate(i / steps, normalized=True)
-                if mask_sampler.get_darkness(pt.x, pt.y) > args.threshold:
-                    current_segment.append((pt.x, pt.y))
-                else:
-                    if len(current_segment) > 1:
-                        masked_lines.append(LineString(current_segment))
-                    current_segment = []
-
-            if len(current_segment) > 1:
-                masked_lines.append(LineString(current_segment))
-
-        return masked_lines
-
-
-@register_modification("roughen")
-class RoughenMod:
-
-    @classmethod
-    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--roughen-amp",
-                           type=float,
-                           default=0.0,
-                           help="Amplitude of hand-drawn noise")
-        group.add_argument("--roughen-step",
-                           type=float,
-                           default=1.0,
-                           help="Resolution of hand-drawn noise")
-
-    def is_active(self, args: argparse.Namespace) -> bool:
-        return getattr(args, 'roughen_amp', 0.0) > 0.0
-
-    def apply(self, lines: List[LineString], args: argparse.Namespace,
-              **kwargs: Any) -> List[LineString]:
-        return [
-            self._roughen_line(line, args.roughen_step, args.roughen_amp)
-            for line in lines
-        ]
-
-    def _roughen_line(self, line: LineString, segment_length: float,
-                      amplitude: float) -> LineString:
-        if line.length <= segment_length:
-            return line
-
-        num_segments = max(1, int(math.ceil(line.length / segment_length)))
-        points = [
-            line.interpolate(i / num_segments, normalized=True).coords[0]
-            for i in range(num_segments + 1)
-        ]
-
-        if len(points) < 3:
-            return line
-
-        wiggled_coords = [points[0]]
-        for i in range(1, len(points) - 1):
-            px, py = points[i - 1]
-            nx, ny = points[i + 1]
-            dx, dy = nx - px, ny - py
-            length = math.hypot(dx, dy)
-
-            if length == 0:
-                wiggled_coords.append(points[i])
-                continue
-
-            norm_x, norm_y = -dy / length, dx / length
-            displacement = random.gauss(0, amplitude)
-            wiggled_coords.append((points[i][0] + norm_x * displacement,
-                                   points[i][1] + norm_y * displacement))
-
-        wiggled_coords.append(points[-1])
-        return LineString(wiggled_coords)
-
-
-@register_modification("fisheye")
-class FisheyeMod:
-
-    @classmethod
-    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--fisheye",
-                           type=float,
-                           default=0.0,
-                           help="Apply radial distortion")
-
-    def is_active(self, args: argparse.Namespace) -> bool:
-        return getattr(args, 'fisheye', 0.0) != 0.0
-
-    def apply(self,
-              lines: List[LineString],
-              args: argparse.Namespace,
-              centroid: Any = None,
-              max_r: float = 0.0,
-              **kwargs: Any) -> List[LineString]:
-        if not centroid or max_r <= 0:
-            return lines
-
-        distorted_lines = []
-        for line in lines:
-            length = line.length
-            if length == 0:
-                continue
-
-            num_segments = max(2, int(math.ceil(length / 0.5)))
-            points = [
-                line.interpolate(i / num_segments, normalized=True).coords[0]
-                for i in range(num_segments + 1)
-            ]
-
-            warped_coords = []
-            for px, py in points:
-                dx, dy = px - centroid.x, py - centroid.y
-                r = math.hypot(dx, dy)
-                f = 1.0 + args.fisheye * ((r / max_r)**2) if r > 0 else 1.0
-                warped_coords.append((centroid.x + dx * f, centroid.y + dy * f))
-
-            distorted_lines.append(LineString(warped_coords))
-
-        return distorted_lines
-
-
-# === BUILT-IN FILL PLUGINS ===
-
-
-@register_fill("concentric")
-class ConcentricFill:
-
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--ring-simplify",
-            type=float,
-            default=0.2,
-            help=
-            "Simplification tolerance specific to inner rings (default: 0.2)")
-
-    def generate(self,
-                 shape: BaseGeometry,
-                 spacing: float,
-                 ring_simplify: float = 0.2,
-                 **kwargs: Any) -> List[LineString]:
-        lines = []
-        current_geom = shape.buffer(-spacing).simplify(ring_simplify,
-                                                       preserve_topology=False)
-
-        while not current_geom.is_empty and current_geom.area > 0:
-            polygons = [current_geom
-                       ] if current_geom.geom_type == 'Polygon' else list(
-                           current_geom.geoms)
-            for p in polygons:
-                if p.exterior:
-                    lines.append(LineString(p.exterior.coords))
-                for interior in p.interiors:
-                    lines.append(LineString(interior.coords))
-            current_geom = current_geom.buffer(-spacing).simplify(
-                ring_simplify, preserve_topology=False)
-
-        return lines
-
-
-@register_fill("zigzag")
-class ZigZagFill:
-
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        pass
-
-    def generate(self, shape: BaseGeometry, spacing: float,
-                 **kwargs: Any) -> List[LineString]:
-        minx, miny, maxx, maxy = shape.bounds
-        y = miny + spacing
-        lines = []
-        left_to_right = True
-
-        while y <= maxy:
-            x_start, x_end = (minx - 1,
-                              maxx + 1) if left_to_right else (maxx + 1,
-                                                               minx - 1)
-            lines.append(LineString([(x_start, y), (x_end, y)]))
-            y += spacing
-            left_to_right = not left_to_right
-
-        return lines
-
-
-@register_fill("photo-contour")
-class PhotoContourFill:
-    """Generates topographic contours driven by image darkness."""
-
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--image",
-                            default=None,
-                            help="Input image for contouring"
-                           ).completer = argcomplete.completers.FilesCompleter(
-                               allowednames=(".png", ".jpg", ".jpeg"))
-
-        parser.add_argument(
-            "--levels",
-            type=int,
-            default=1,
-            help=
-            "Number of contour levels to extract from the image (default: 15)")
-        parser.add_argument(
-            "--resolution",
-            type=float,
-            default=0.5,
-            help=
-            "Sampling resolution in physical units. Lower is more detailed but slower. (default: 0.5)"
-        )
-        parser.add_argument(
-            "--min-length",
-            type=float,
-            default=2.0,
-            help=
-            "Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
-        )
-
-    def generate(self,
-                 shape: BaseGeometry,
-                 sampler: ImageSampler = None,
-                 levels: int = 1,
-                 resolution: float = 0.5,
-                 min_length: float = 2.0,
-                 **kwargs: Any) -> List[LineString]:
-
-        if not sampler:
-            print(
-                "Warning: 'photo-contour' requires an --image argument. Returning empty fill."
-            )
-            return []
-
-        minx, miny, maxx, maxy = shape.bounds
-        width = maxx - minx
-        height = maxy - miny
-
-        res_x = max(2, int(width / resolution))
-        res_y = max(2, int(height / resolution))
-
-        grid = np.zeros((res_y, res_x))
-        for i in range(res_y):
-            py = miny + (i / (res_y - 1)) * height
-            for j in range(res_x):
-                px = minx + (j / (res_x - 1)) * width
-                grid[i, j] = sampler.get_darkness(px, py)
-
-        lines = []
-        thresholds = np.linspace(0.05, 0.95, levels)
-
-        for level in thresholds:
-            contours = measure.find_contours(grid, level)
-
-            for contour in contours:
-                coords = []
-                for pt in contour:
-                    y_idx, x_idx = pt[0], pt[1]
-                    px = minx + (x_idx / (res_x - 1)) * width
-                    py = miny + (y_idx / (res_y - 1)) * height
-                    coords.append((px, py))
-
-                if len(coords) >= 2:
-                    line = LineString(coords)
-
-                    if line.length >= min_length:
-                        lines.append(line)
-
-        return lines
 
 
 @dataclass
@@ -558,7 +192,6 @@ class PenConfig:
 
 
 class PenTool:
-
     def __init__(self,
                  config: PenConfig,
                  output_filename: str = "output.nc") -> None:
@@ -618,6 +251,9 @@ class PenTool:
 
 
 def parse_args() -> argparse.Namespace:
+    # Discover and register all plugins automatically before building the parser
+    load_plugins()
+    
     parser = argparse.ArgumentParser(
         description="Generate CNC G-code from a DXF file using a pen tool.")
 
@@ -670,7 +306,7 @@ def parse_args() -> argparse.Namespace:
                                     default=0.0,
                                     help="Simplification tolerance for fill")
 
-        # Fill-specific arguments (like --image for photo-contour)
+        # Fill-specific arguments
         plugin_class.setup_cli(pattern_parser)
 
     argcomplete.autocomplete(parser)
@@ -724,8 +360,7 @@ def main() -> None:
                 dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
                 if math.hypot(dx, dy) < 0.01:
                     poly = Polygon(pts)
-                    poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(
-                        0)
+                    poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
                     if poly.area > 0:
                         closed_polys.append(poly)
 
@@ -805,9 +440,7 @@ def main() -> None:
 
                 if not args.no_optimize and raw_fill_coords:
                     print(f"Optimizing {args.pattern} fill paths...")
-                    last_pos = (
-                        0.0,
-                        0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+                    last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
                     raw_fill_coords = optimize_paths_nearest_neighbor(
                         raw_fill_coords, start_pt=last_pos)
 
