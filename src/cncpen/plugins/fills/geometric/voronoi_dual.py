@@ -1,8 +1,9 @@
 import argparse
-import numpy as np
-from scipy.spatial import Voronoi, Delaunay
-from typing import List, Any
+from typing import Any, List
 
+import numpy as np
+from scipy.spatial import Delaunay
+from scipy.spatial import Voronoi
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
@@ -16,26 +17,32 @@ class VoronoiDualFill:
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
-            "--num-points", 
-            type=int, 
+            "--num-points",
+            type=int,
             default=0,
-            help="Number of random points to generate. If 0, it auto-calculates based on the global --spacing. (default: 0)"
+            help=
+            "Number of random points to generate. If 0, it auto-calculates based on the global --spacing. (default: 0)"
         )
         parser.add_argument(
-            "--seed", 
-            type=int, 
+            "--seed",
+            type=int,
             default=42,
-            help="Random seed for repeatable point generation (default: 42)"
-        )
+            help="Random seed for repeatable point generation (default: 42)")
         parser.add_argument(
-            "--mode", 
-            choices=["voronoi", "delaunay", "dual"], 
+            "--mode",
+            choices=["voronoi", "delaunay", "dual"],
             default="dual",
-            help="Which edges to draw: 'voronoi', 'delaunay', or 'dual' for both. (default: dual)"
+            help=
+            "Which edges to draw: 'voronoi', 'delaunay', or 'dual' for both. (default: dual)"
         )
 
-    def generate(self, shape: BaseGeometry, spacing: float, num_points: int = 0, 
-                 seed: int = 42, mode: str = "dual", **kwargs: Any) -> List[LineString]:
+    def generate(self,
+                 shape: BaseGeometry,
+                 spacing: float,
+                 num_points: int = 0,
+                 seed: int = 42,
+                 mode: str = "dual",
+                 **kwargs: Any) -> List[LineString]:
         lines = []
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
@@ -50,13 +57,13 @@ class VoronoiDualFill:
             area = width * height
             # Enforce a minimum spacing to prevent memory overflow on dense requested patterns
             safe_spacing = max(0.2, spacing)
-            num_points = max(4, int(area / (safe_spacing ** 2)))
+            num_points = max(4, int(area / (safe_spacing**2)))
 
-        # Expand generation bounds slightly so that Voronoi ridges don't 
+        # Expand generation bounds slightly so that Voronoi ridges don't
         # prematurely terminate before hitting the true clipping boundary.
         margin_x = width * 0.1
         margin_y = height * 0.1
-        
+
         np.random.seed(seed)
         xs = np.random.uniform(minx - margin_x, maxx + margin_x, num_points)
         ys = np.random.uniform(miny - margin_y, maxy + margin_y, num_points)
@@ -79,7 +86,7 @@ class VoronoiDualFill:
         if mode in ["delaunay", "dual"]:
             tri = Delaunay(points)
             delaunay_edges = set()
-            
+
             # Extract unique edges from the simplices (triangles)
             for simplex in tri.simplices:
                 for i in range(3):
@@ -87,7 +94,7 @@ class VoronoiDualFill:
                     idx2 = simplex[(i + 1) % 3]
                     # Sort the vertex indices so (A, B) and (B, A) hash to the same tuple
                     delaunay_edges.add(tuple(sorted([idx1, idx2])))
-            
+
             for edge in delaunay_edges:
                 p1 = points[edge[0]]
                 p2 = points[edge[1]]

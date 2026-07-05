@@ -1,12 +1,13 @@
 import math
-import sys
 from pathlib import Path
-from typing import List, Tuple, Union
 import random
+import sys
+from typing import List, Tuple, Union
 
 import ezdxf
 from ezdxf.path import make_path
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 from shapely.ops import linemerge
 
 
@@ -16,10 +17,9 @@ class DXFReadError(Exception):
 
 
 def extract_dxf_paths(
-    filepath: Union[str, Path], 
-    flatten_distance: float = 0.1, 
-    simplify_tolerance: float = 0.0
-) -> List[List[Tuple[float, float]]]:
+        filepath: Union[str, Path],
+        flatten_distance: float = 0.1,
+        simplify_tolerance: float = 0.0) -> List[List[Tuple[float, float]]]:
     """
     Reads a DXF file, flattens entities, and stitches disconnected 
     segments together to heal poor SVG-to-DXF conversions.
@@ -49,8 +49,7 @@ def extract_dxf_paths(
             except Exception as e:
                 print(
                     f"Warning: could not process {entity.dxftype()} entity: {e}",
-                    file=sys.stderr
-                )
+                    file=sys.stderr)
 
     if not raw_lines:
         return []
@@ -60,10 +59,8 @@ def extract_dxf_paths(
 
     # 3. Apply simplification if a tolerance is provided
     if simplify_tolerance > 0:
-        merged_geometry = merged_geometry.simplify(
-            simplify_tolerance,
-            preserve_topology=True
-        )
+        merged_geometry = merged_geometry.simplify(simplify_tolerance,
+                                                   preserve_topology=True)
 
     paths: List[List[Tuple[float, float]]] = []
 
@@ -78,7 +75,7 @@ def extract_dxf_paths(
 
 
 def optimize_paths_nearest_neighbor(
-    paths: List[List[Tuple[float, float]]], 
+    paths: List[List[Tuple[float, float]]],
     start_pt: Tuple[float, float] = (0.0, 0.0)
 ) -> List[List[Tuple[float, float]]]:
     """
@@ -131,13 +128,19 @@ def optimize_paths_nearest_neighbor(
 
     return optimized
 
-def roughen_line(line: LineString, segment_length: float = 1.0, amplitude: float = 0.2) -> LineString:
+
+def roughen_line(line: LineString,
+                 segment_length: float = 1.0,
+                 amplitude: float = 0.2) -> LineString:
     """Subdivides a line and applies Gaussian noise perpendicular to the path."""
     if line.length <= segment_length:
         return line
 
     num_segments = max(1, int(math.ceil(line.length / segment_length)))
-    points = [line.interpolate(i / num_segments, normalized=True).coords[0] for i in range(num_segments + 1)]
+    points = [
+        line.interpolate(i / num_segments, normalized=True).coords[0]
+        for i in range(num_segments + 1)
+    ]
 
     if len(points) < 3:
         return line
@@ -147,18 +150,19 @@ def roughen_line(line: LineString, segment_length: float = 1.0, amplitude: float
     for i in range(1, len(points) - 1):
         px, py = points[i - 1]
         nx, ny = points[i + 1]
-        
+
         dx, dy = nx - px, ny - py
         length = math.hypot(dx, dy)
-        
+
         if length == 0:
             wiggled_coords.append(points[i])
             continue
-            
+
         norm_x, norm_y = -dy / length, dx / length
         displacement = random.gauss(0, amplitude)
-        
-        wiggled_coords.append((points[i][0] + norm_x * displacement, points[i][1] + norm_y * displacement))
+
+        wiggled_coords.append((points[i][0] + norm_x * displacement,
+                               points[i][1] + norm_y * displacement))
 
     wiggled_coords.append(points[-1])
     return LineString(wiggled_coords)

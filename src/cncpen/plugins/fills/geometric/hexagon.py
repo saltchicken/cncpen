@@ -1,6 +1,6 @@
 import argparse
 import math
-from typing import List, Any
+from typing import Any, List
 
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
@@ -15,15 +15,17 @@ class HexagonFill:
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
-            "--radius", 
-            type=float, 
+            "--radius",
+            type=float,
             default=3.0,
-            help="Radius (center to vertex) of the hexagons (default: 3.0)"
-        )
+            help="Radius (center to vertex) of the hexagons (default: 3.0)")
 
-    def generate(self, shape: BaseGeometry, radius: float = 3.0, **kwargs: Any) -> List[LineString]:
+    def generate(self,
+                 shape: BaseGeometry,
+                 radius: float = 3.0,
+                 **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
-        
+
         if radius <= 0:
             return []
 
@@ -63,10 +65,10 @@ class HexagonFill:
                 for i in range(6):
                     p1, p2 = vertices[i], vertices[(i + 1) % 6]
                     k1, k2 = quantize(p1), quantize(p2)
-                    
+
                     pts_map[k1] = p1
                     pts_map[k2] = p2
-                    
+
                     edge = (k1, k2) if k1 < k2 else (k2, k1)
                     unique_edges.add(edge)
 
@@ -81,23 +83,26 @@ class HexagonFill:
         # 3. Smart Eulerian path routing using a Look-Ahead Heuristic
         while unique_edges:
             start_node = None
-            
-            # Start prioritization: 
+
+            # Start prioritization:
             # 1. Degree 1 (Clear true dead ends first)
             # 2. Degree 3 (Standard odd nodes, clearing them makes the graph even)
             # 3. Degree 2/4 (Even nodes last)
             for target_degree in [1, 3, 2, 4]:
-                candidates = [n for n, neighbors in adj.items() if len(neighbors) == target_degree]
+                candidates = [
+                    n for n, neighbors in adj.items()
+                    if len(neighbors) == target_degree
+                ]
                 if candidates:
                     start_node = candidates[0]
                     break
-                    
+
             if start_node is None:
                 break
-                
+
             path = [start_node]
             curr = start_node
-            
+
             # Walk the graph
             while adj[curr]:
                 # THE HEURISTIC: Look at all connected nodes.
@@ -105,20 +110,20 @@ class HexagonFill:
                 # Pick the one with the HIGHEST remaining connections to avoid walking into a trap.
                 neighbors = list(adj[curr])
                 neighbors.sort(key=lambda n: len(adj[n]), reverse=True)
-                
+
                 nxt = neighbors[0]
-                
+
                 # Consume the edge
                 adj[curr].remove(nxt)
                 adj[nxt].remove(curr)
-                
+
                 # Remove from tracking set
                 e = (curr, nxt) if curr < nxt else (nxt, curr)
                 unique_edges.discard(e)
-                
+
                 path.append(nxt)
                 curr = nxt
-                
+
             # Convert quantized path back to precise float coordinates
             if len(path) > 1:
                 float_path = [pts_map[node] for node in path]

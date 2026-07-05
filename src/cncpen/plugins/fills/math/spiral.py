@@ -63,7 +63,7 @@ class SpiralFill:
                 step = resolution / r
             else:
                 step = resolution  # Avoid dividing by near-zero at the origin
-            
+
             # Clamp the step to prevent overly massive jumps near the center
             step = min(max(step, 0.01), math.pi / 4)
             theta += step

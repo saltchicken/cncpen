@@ -1,8 +1,9 @@
 import argparse
 import math
-from typing import List, Any
+from typing import Any, List
 
-from shapely.geometry import Point, LineString
+from shapely.geometry import LineString
+from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
 from cncpen.fills import register_fill
@@ -11,12 +12,13 @@ from cncpen.fills import register_fill
 @register_fill("sacred")
 class SacredFill:
     """Generates a Flower of Life (overlapping circles) sacred geometry fill."""
-    
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         pass
 
-    def generate(self, shape: BaseGeometry, spacing: float, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, spacing: float,
+                 **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         radius = max(spacing, 0.1)
         dx = radius
@@ -35,7 +37,8 @@ class SacredFill:
             x_offset = (radius / 2.0) if (row % 2 != 0) else 0.0
             x = minx + x_offset
             while x <= maxx:
-                circle_outline = Point(x, y).buffer(radius, resolution=32).exterior
+                circle_outline = Point(x, y).buffer(radius,
+                                                    resolution=32).exterior
                 circles.append(LineString(circle_outline.coords))
                 x += dx
             y += dy

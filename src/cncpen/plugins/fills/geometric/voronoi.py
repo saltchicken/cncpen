@@ -1,8 +1,9 @@
 import argparse
 import random
-from typing import List, Any
+from typing import Any, List
 
-from shapely.geometry import MultiPoint, LineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiPoint
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import voronoi_diagram
 
@@ -18,13 +19,16 @@ class VoronoiFill:
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
-            "--sites", 
-            type=int, 
+            "--sites",
+            type=int,
             default=500,
-            help="Number of seed points for the Voronoi diagram (default: 500)"
-        )
+            help="Number of seed points for the Voronoi diagram (default: 500)")
 
-    def generate(self, shape: BaseGeometry, sites: int = 500, sampler=None, **kwargs: Any) -> List[LineString]:
+    def generate(self,
+                 shape: BaseGeometry,
+                 sites: int = 500,
+                 sampler=None,
+                 **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny
@@ -36,7 +40,7 @@ class VoronoiFill:
         attempts = 0
         max_attempts = sites * 10
 
-        # 1. Generate seed points (sites). 
+        # 1. Generate seed points (sites).
         # If an image sampler is present, heavily weight site generation toward dark areas.
         while len(points) < sites and attempts < max_attempts:
             attempts += 1
@@ -56,10 +60,12 @@ class VoronoiFill:
 
         # 2. Compute the Voronoi diagram
         multipoint = MultiPoint(points)
-        
-        # By setting edges=True, Shapely returns the boundaries of the cells 
+
+        # By setting edges=True, Shapely returns the boundaries of the cells
         # as LineStrings instead of returning them as filled Polygons.
-        diagram = voronoi_diagram(multipoint, envelope=shape.envelope, edges=True)
+        diagram = voronoi_diagram(multipoint,
+                                  envelope=shape.envelope,
+                                  edges=True)
 
         # 3. Extract the raw lines
         lines = []

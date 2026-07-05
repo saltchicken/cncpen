@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 from gscrib import GCodeBuilder
 
@@ -13,7 +13,10 @@ class PenConfig:
 
 
 class PenTool:
-    def __init__(self, config: PenConfig, output_filename: str = "output.nc") -> None:
+
+    def __init__(self,
+                 config: PenConfig,
+                 output_filename: str = "output.nc") -> None:
         self.g = GCodeBuilder(output=output_filename)
         self.config = config
         self.current_z: Optional[float] = None  # Track the current Z height
@@ -23,7 +26,8 @@ class PenTool:
         # Initialize Z-height state explicitly after preamble
         return self
 
-    def __exit__(self, exc_type: type, exc_val: Exception, exc_tb: type) -> None:
+    def __exit__(self, exc_type: type, exc_val: Exception,
+                 exc_tb: type) -> None:
         self.tool_off(clearance=True)
         self._build_postamble()
         self.g.flush()
@@ -41,7 +45,6 @@ class PenTool:
         self.g.rapid(z=self.config.clearance_z)
         self.current_z = self.config.clearance_z
 
-
     def _build_postamble(self) -> None:
         """Writes the required final G-code commands."""
         self.g.write("M5")
@@ -50,7 +53,7 @@ class PenTool:
 
     def move_to(self, x: float, y: float, clearance: bool = False) -> None:
         # Safely ensure we are at the proper height before rapid XY move
-        self.tool_off(clearance=clearance)  
+        self.tool_off(clearance=clearance)
         self.g.rapid(x=x, y=y)
 
     def tool_on(self) -> None:
@@ -68,15 +71,17 @@ class PenTool:
             self.g.rapid(z=target_z)
             self.current_z = target_z
 
-    def draw_path(self, points: List[Tuple[float, float]], clearance: bool = False) -> None:
+    def draw_path(self,
+                  points: List[Tuple[float, float]],
+                  clearance: bool = False) -> None:
         """Draws a series of coordinate points."""
         if not points:
             return
-        
+
         # Move to the start of the path using the requested clearance height
         self.move_to(*points[0], clearance=clearance)
         self.tool_on()
-        
+
         for x, y in points[1:]:
             self.g.move(x=x, y=y, f=self.config.feed_rate)
 

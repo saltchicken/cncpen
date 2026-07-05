@@ -1,8 +1,9 @@
 import argparse
 import math
-from typing import List, Any
+from typing import Any, List
 
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString
+from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
 from cncpen.fills import register_fill
@@ -22,13 +23,19 @@ class ZentangleFill:
             "--density",
             type=float,
             default=3.0,
-            help="Base resolution of internal textures. Lower = tighter drawing (default: 3.0)",
+            help=
+            "Base resolution of internal textures. Lower = tighter drawing (default: 3.0)",
         )
 
-    def generate(self, shape: BaseGeometry, spacing: float, density: float = 3.0, sampler=None, **kwargs: Any) -> List[LineString]:
+    def generate(self,
+                 shape: BaseGeometry,
+                 spacing: float,
+                 density: float = 3.0,
+                 sampler=None,
+                 **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
-        
+
         lines = []
         step = max(spacing, density)
 
@@ -38,7 +45,7 @@ class ZentangleFill:
                 # Image-Driven Mode
                 darkness = sampler.get_darkness(x, y)
                 if darkness < 0.15:
-                    return -1 # Too light, leave blank
+                    return -1  # Too light, leave blank
                 elif darkness < 0.45:
                     return 0  # Light texture
                 elif darkness < 0.75:
@@ -49,12 +56,16 @@ class ZentangleFill:
                 # Math-Driven Mode (Wavy Bands)
                 nx = (x - minx) / max(width, 1.0)
                 ny = (y - miny) / max(height, 1.0)
-                wave = 0.4 * math.sin(nx * 4.0) + 0.15 * math.sin(ny * 7.5 + nx * 2.0)
+                wave = 0.4 * math.sin(
+                    nx * 4.0) + 0.15 * math.sin(ny * 7.5 + nx * 2.0)
                 val = (nx + ny) / 2.0 + wave
 
-                if val < 0.4: return 0
-                elif val < 0.65: return 1
-                else: return 2
+                if val < 0.4:
+                    return 0
+                elif val < 0.65:
+                    return 1
+                else:
+                    return 2
 
         y = miny
         while y <= maxy + step:
@@ -73,7 +84,8 @@ class ZentangleFill:
                 if zone == 0:
                     # Draw a simple circle in the center of the cell
                     radius = step * 0.35
-                    circle = Point(cx, cy).buffer(radius, resolution=12).exterior
+                    circle = Point(cx, cy).buffer(radius,
+                                                  resolution=12).exterior
                     lines.append(LineString(circle.coords))
 
                 # ZONE 1: Overlapping Scales/Petals (Medium Shading)
@@ -82,7 +94,8 @@ class ZentangleFill:
                     scale_points = []
                     for theta in range(0, 181, 30):
                         rad = math.radians(theta)
-                        scale_points.append((cx + (step * 0.6) * math.cos(rad), cy + (step * 0.6) * math.sin(rad)))
+                        scale_points.append((cx + (step * 0.6) * math.cos(rad),
+                                             cy + (step * 0.6) * math.sin(rad)))
                     lines.append(LineString(scale_points))
 
                 # ZONE 2: Dense Spirals (Dark Shading)
@@ -94,8 +107,9 @@ class ZentangleFill:
                         t = math.radians(i)
                         # Spiral grows outwards
                         r = (step * 0.45) * (i / (360 * max_turns))
-                        spiral_points.append((cx + r * math.cos(t), cy + r * math.sin(t)))
-                    
+                        spiral_points.append(
+                            (cx + r * math.cos(t), cy + r * math.sin(t)))
+
                     if len(spiral_points) > 1:
                         lines.append(LineString(spiral_points))
 

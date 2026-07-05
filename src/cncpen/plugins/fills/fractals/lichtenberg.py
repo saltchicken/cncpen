@@ -1,9 +1,10 @@
 import argparse
 import math
 import random
-from typing import List, Any
+from typing import Any, List
 
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString
+from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
 from cncpen.fills import register_fill
@@ -15,19 +16,28 @@ class LichtenbergFill:
     Generates a Lichtenberg-style (branching fractal) fill using an RRT
     (Rapidly-exploring Random Tree) algorithm confined to the polygon.
     """
-    
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--nodes", type=int, default=1500,
-                            help="Number of branches/nodes for Lichtenberg fill (default: 1500)")
+        parser.add_argument(
+            "--nodes",
+            type=int,
+            default=1500,
+            help="Number of branches/nodes for Lichtenberg fill (default: 1500)"
+        )
 
-    def generate(self, shape: BaseGeometry, spacing: float, nodes: int = 1500, **kwargs: Any) -> List[LineString]:
+    def generate(self,
+                 shape: BaseGeometry,
+                 spacing: float,
+                 nodes: int = 1500,
+                 **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         root = shape.centroid
-        
+
         if not shape.contains(root):
             for _ in range(100):
-                p = Point(random.uniform(minx, maxx), random.uniform(miny, maxy))
+                p = Point(random.uniform(minx, maxx),
+                          random.uniform(miny, maxy))
                 if shape.contains(p):
                     root = p
                     break

@@ -1,6 +1,6 @@
 import argparse
 import math
-from typing import List, Any
+from typing import Any, List
 
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
@@ -11,12 +11,13 @@ from cncpen.fills import register_fill
 @register_fill("hilbert")
 class HilbertFill:
     """Generates a highly intricate Hilbert space-filling curve."""
-    
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         pass
 
-    def generate(self, shape: BaseGeometry, spacing: float, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, spacing: float,
+                 **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny
@@ -44,5 +45,5 @@ class HilbertFill:
         pts = hilbert(minx, miny, size, 0.0, 0.0, size, order)
         if len(pts) < 2:
             return []
-        
+
         return [LineString(pts)]

@@ -1,6 +1,6 @@
 import argparse
 import math
-from typing import List, Tuple, Any
+from typing import Any, List, Tuple
 
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
@@ -23,13 +23,17 @@ class PenroseFill:
             "--depth",
             type=int,
             default=5,
-            help="Recursion depth for triangle deflation. Higher = smaller tiles (default: 5)",
+            help=
+            "Recursion depth for triangle deflation. Higher = smaller tiles (default: 5)",
         )
 
-    def generate(self, shape: BaseGeometry, depth: int = 5, **kwargs: Any) -> List[LineString]:
+    def generate(self,
+                 shape: BaseGeometry,
+                 depth: int = 5,
+                 **kwargs: Any) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y
-        
+
         # Calculate a safe radius to fully cover the bounding box
         dx = max(abs(maxx - cx), abs(cx - minx))
         dy = max(abs(maxy - cy), abs(cy - miny))
@@ -40,11 +44,11 @@ class PenroseFill:
         for i in range(10):
             a1 = i * math.pi / 5.0
             a2 = (i + 1) * math.pi / 5.0
-            
+
             p1 = (cx, cy)
             p2 = (cx + radius * math.cos(a1), cy + radius * math.sin(a1))
             p3 = (cx + radius * math.cos(a2), cy + radius * math.sin(a2))
-            
+
             # Subdivide orientation alternating to form valid Penrose rhombs
             if i % 2 == 0:
                 triangles.append((0, p1, p2, p3))
@@ -61,7 +65,7 @@ class PenroseFill:
                     ax = p1[0] + (p2[0] - p1[0]) / PHI
                     ay = p1[1] + (p2[1] - p1[1]) / PHI
                     p_new = (ax, ay)
-                    
+
                     next_triangles.append((0, p3, p_new, p2))
                     next_triangles.append((1, p_new, p3, p1))
                 else:
@@ -70,22 +74,25 @@ class PenroseFill:
                     bx = p2[0] + (p1[0] - p2[0]) / PHI
                     by = p2[1] + (p1[1] - p2[1]) / PHI
                     p_new1 = (bx, by)
-                    
+
                     cx = p2[0] + (p3[0] - p2[0]) / PHI
                     cy = p2[1] + (p3[1] - p2[1]) / PHI
                     p_new2 = (cx, cy)
-                    
+
                     next_triangles.append((1, p_new2, p_new1, p2))
                     next_triangles.append((0, p_new1, p_new2, p3))
                     next_triangles.append((1, p_new1, p3, p1))
-                    
+
             triangles = next_triangles
 
         # Extract unique line segments to avoid drawing overlapping lines twice
         seen_edges = set()
         lines = []
 
-        def get_edge_key(pt1: Tuple[float, float], pt2: Tuple[float, float]) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+        def get_edge_key(
+            pt1: Tuple[float, float],
+            pt2: Tuple[float,
+                       float]) -> Tuple[Tuple[int, int], Tuple[int, int]]:
             # Quantize coordinates to prevent floating point duplicates
             k1 = (int(round(pt1[0] * 100)), int(round(pt1[1] * 100)))
             k2 = (int(round(pt2[0] * 100)), int(round(pt2[1] * 100)))

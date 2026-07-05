@@ -1,6 +1,6 @@
 import argparse
 import math
-from typing import List, Any
+from typing import Any, List
 
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
@@ -14,19 +14,33 @@ class MorphingGridFill:
     Generates a grid of geometric shapes. Morphs in complexity, scale, and rotation 
     based EITHER on an underlying photo sampler OR a mathematical waveform progression.
     """
-    
+
     handles_image_natively = True
-    
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--cell-size", type=float, default=5.0,
-                            help="Size of the bounding grid for each morphing cell (default: 5.0)")
-        parser.add_argument("--morph-cycles", type=float, default=1.0,
-                            help="Number of complete waveform morph cycles (ignored if --image is used)")
+        parser.add_argument(
+            "--cell-size",
+            type=float,
+            default=5.0,
+            help=
+            "Size of the bounding grid for each morphing cell (default: 5.0)")
+        parser.add_argument(
+            "--morph-cycles",
+            type=float,
+            default=1.0,
+            help=
+            "Number of complete waveform morph cycles (ignored if --image is used)"
+        )
 
-    def generate(self, shape: BaseGeometry, spacing: float, cell_size: float = 5.0, 
-                 morph_cycles: float = 1.0, sampler=None, **kwargs: Any) -> List[LineString]:
-        
+    def generate(self,
+                 shape: BaseGeometry,
+                 spacing: float,
+                 cell_size: float = 5.0,
+                 morph_cycles: float = 1.0,
+                 sampler=None,
+                 **kwargs: Any) -> List[LineString]:
+
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny
@@ -41,7 +55,7 @@ class MorphingGridFill:
         while y <= maxy:
             x = minx + (step / 2)
             while x <= maxx:
-                
+
                 if sampler:
                     # Photo-Driven Mode
                     norm_phase = sampler.get_darkness(x, y)
