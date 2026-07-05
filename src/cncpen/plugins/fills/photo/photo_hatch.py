@@ -26,7 +26,7 @@ class PhotoHatchFill:
                             help="Size of the hatching grid cells")
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         cell_size = getattr(context.args, 'cell_size', 2.0)
         sampler = getattr(context.args, 'sampler', None)
         if not sampler:

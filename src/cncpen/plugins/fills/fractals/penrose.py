@@ -29,7 +29,7 @@ class PenroseFill:
         )
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         depth = getattr(context.args, 'depth', 5)
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y

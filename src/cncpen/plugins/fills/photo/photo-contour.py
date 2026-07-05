@@ -45,7 +45,7 @@ class PhotoContourFill:
         )
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         sampler = getattr(context.args, 'sampler', None)
         levels = getattr(context.args, 'levels', 15)
         resolution = getattr(context.args, 'resolution', 0.5)

@@ -19,7 +19,7 @@ class SacredFill:
         pass
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         radius = max(context.args.spacing, 0.1)
         minx, miny, maxx, maxy = shape.bounds
         dx = radius

@@ -26,7 +26,7 @@ class VoronoiFill:
             help="Number of seed points for the Voronoi diagram (default: 500)")
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         sites = getattr(context.args, 'sites', 500)
         sampler = getattr(context.args, 'sampler', None)
         minx, miny, maxx, maxy = shape.bounds

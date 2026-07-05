@@ -35,7 +35,7 @@ class MorphingGridFill:
         )
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         spacing = context.args.spacing
         cell_size = getattr(context.args, 'cell_size', 5.0)
         morph_cycles = getattr(context.args, 'morph_cycles', 1.0)

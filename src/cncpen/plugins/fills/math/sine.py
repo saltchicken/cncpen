@@ -29,7 +29,7 @@ class SineFill:
             help="Wavelength for the sine wave pattern (default: 5.0)")
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         spacing = context.args.spacing
         amplitude = getattr(context.args, 'amplitude', 1.0)
         wavelength = getattr(context.args, 'wavelength', 5.0)

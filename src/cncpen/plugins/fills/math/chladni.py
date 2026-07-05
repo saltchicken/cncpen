@@ -42,7 +42,7 @@ class ChladniFill:
             help="Grid sampling resolution for tracing lines (default: 0.5)")
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         n = getattr(context.args, 'n', 3.0)
         m = getattr(context.args, 'm', 5.0)
         sign = getattr(context.args, 'sign', -1.0)

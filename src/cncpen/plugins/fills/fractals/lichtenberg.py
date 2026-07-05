@@ -28,7 +28,7 @@ class LichtenbergFill:
         )
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         spacing = context.args.spacing
         nodes = getattr(context.args, 'nodes', 1500)
         minx, miny, maxx, maxy = shape.bounds

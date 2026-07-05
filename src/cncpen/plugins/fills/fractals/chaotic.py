@@ -41,7 +41,7 @@ class ChaoticFill:
         )
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         spacing = context.args.spacing
         depth = getattr(context.args, 'depth', 4)
         chaos_freq = getattr(context.args, 'chaos_freq', 0.15)

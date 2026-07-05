@@ -31,7 +31,7 @@ class PhotoWaveFill:
                             help="Maximum wave amplitude multiplier")
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         lines = getattr(context.args, 'lines', 80)
         amp = getattr(context.args, 'amp', 2.0)
         sampler = getattr(context.args, 'sampler', None)

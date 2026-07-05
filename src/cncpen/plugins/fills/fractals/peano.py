@@ -18,7 +18,7 @@ class PeanoFill:
         pass
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         spacing = context.args.spacing
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

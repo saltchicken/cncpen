@@ -22,7 +22,7 @@ class TriangleFill:
             help="Side length of the equilateral triangles (default: 5.0)")
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         cell_size = getattr(context.args, 'cell_size', 5.0)
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y

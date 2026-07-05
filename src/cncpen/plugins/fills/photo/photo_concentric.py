@@ -34,7 +34,7 @@ class PhotoConcentricFill:
         # Note: --spacing and --threshold are already provided by your global CLI
 
     def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+                 context: 'RenderContext') -> List[LineString]:
         sampler = getattr(context.args, 'sampler', None)
         spacing = context.args.spacing
         threshold = getattr(context.args, 'threshold', 0.5)
