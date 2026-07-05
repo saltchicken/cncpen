@@ -1,12 +1,17 @@
 import argparse
 import math
 from typing import Any, List, Optional
+
 import argcomplete
 from shapely.geometry import LineString
-from cncpen import register_modification, ImageSampler
+
+from cncpen import ImageSampler
+from cncpen import register_modification
+
 
 @register_modification("image_mask")
 class ImageMaskMod:
+
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
         group.add_argument("--mask-image",

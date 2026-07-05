@@ -1,13 +1,17 @@
 import argparse
-import argcomplete
 import math
 import random
 from typing import Any, List
+
+import argcomplete
 from shapely.geometry import LineString
+
 from cncpen import register_modification
+
 
 @register_modification("roughen")
 class RoughenMod:
+
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
         group.add_argument("--roughen-amp",

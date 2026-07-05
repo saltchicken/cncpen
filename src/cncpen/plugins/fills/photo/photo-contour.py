@@ -1,15 +1,20 @@
 import argparse
 from typing import Any, List
+
 import argcomplete
 import numpy as np
-from skimage import measure
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
-from cncpen import register_fill, ImageSampler
+from skimage import measure
+
+from cncpen import ImageSampler
+from cncpen import register_fill
+
 
 @register_fill("photo-contour")
 class PhotoContourFill:
     """Generates topographic contours driven by image darkness."""
+
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--image",
@@ -22,18 +27,21 @@ class PhotoContourFill:
             "--levels",
             type=int,
             default=1,
-            help="Number of contour levels to extract from the image (default: 15)")
+            help=
+            "Number of contour levels to extract from the image (default: 15)")
         parser.add_argument(
             "--resolution",
             type=float,
             default=0.5,
-            help="Sampling resolution in physical units. Lower is more detailed but slower. (default: 0.5)"
+            help=
+            "Sampling resolution in physical units. Lower is more detailed but slower. (default: 0.5)"
         )
         parser.add_argument(
             "--min-length",
             type=float,
             default=2.0,
-            help="Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
+            help=
+            "Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
         )
 
     def generate(self,
@@ -45,7 +53,9 @@ class PhotoContourFill:
                  **kwargs: Any) -> List[LineString]:
 
         if not sampler:
-            print("Warning: 'photo-contour' requires an --image argument. Returning empty fill.")
+            print(
+                "Warning: 'photo-contour' requires an --image argument. Returning empty fill."
+            )
             return []
 
         minx, miny, maxx, maxy = shape.bounds

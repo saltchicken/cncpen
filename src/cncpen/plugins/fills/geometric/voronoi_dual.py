@@ -1,7 +1,7 @@
 import argparse
-import argcomplete
 from typing import Any, List
 
+import argcomplete
 import numpy as np
 from scipy.spatial import Delaunay
 from scipy.spatial import Voronoi

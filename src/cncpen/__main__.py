@@ -24,7 +24,10 @@ from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
 
-from cncpen import FILL_REGISTRY, MODIFICATION_REGISTRY, ImageSampler
+from cncpen import FILL_REGISTRY
+from cncpen import ImageSampler
+from cncpen import MODIFICATION_REGISTRY
+
 
 class DXFReadError(Exception):
     """Raised when a DXF file cannot be successfully read or parsed."""
@@ -38,7 +41,8 @@ def load_plugins() -> None:
     except ImportError:
         return
 
-    for _, name, is_pkg in pkgutil.walk_packages(cncpen.plugins.__path__, cncpen.plugins.__name__ + "."):
+    for _, name, is_pkg in pkgutil.walk_packages(cncpen.plugins.__path__,
+                                                 cncpen.plugins.__name__ + "."):
         if not is_pkg:
             importlib.import_module(name)
 
@@ -190,6 +194,7 @@ class PenConfig:
 
 
 class PenTool:
+
     def __init__(self,
                  config: PenConfig,
                  output_filename: str = "output.nc") -> None:
@@ -251,7 +256,7 @@ class PenTool:
 def parse_args() -> argparse.Namespace:
     # Discover and register all plugins automatically before building the parser
     load_plugins()
-    
+
     parser = argparse.ArgumentParser(
         description="Generate CNC G-code from a DXF file using a pen tool.")
 
@@ -358,7 +363,8 @@ def main() -> None:
                 dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
                 if math.hypot(dx, dy) < 0.01:
                     poly = Polygon(pts)
-                    poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
+                    poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(
+                        0)
                     if poly.area > 0:
                         closed_polys.append(poly)
 
@@ -438,7 +444,9 @@ def main() -> None:
 
                 if not args.no_optimize and raw_fill_coords:
                     print(f"Optimizing {args.pattern} fill paths...")
-                    last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+                    last_pos = (
+                        0.0,
+                        0.0) if not paths_to_draw else paths_to_draw[-1][-1]
                     raw_fill_coords = optimize_paths_nearest_neighbor(
                         raw_fill_coords, start_pt=last_pos)
 

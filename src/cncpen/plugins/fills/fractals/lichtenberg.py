@@ -1,9 +1,9 @@
 import argparse
-import argcomplete
 import math
 import random
 from typing import Any, List
 
+import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry

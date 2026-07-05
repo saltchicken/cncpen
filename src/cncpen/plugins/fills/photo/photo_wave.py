@@ -1,8 +1,8 @@
 import argparse
 import math
 from typing import Any, List
-import argcomplete
 
+import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
@@ -16,10 +16,10 @@ class PhotoWaveFill:
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--image",
-                    default=None,
-                    help="Input image for contouring"
-                    ).completer = argcomplete.completers.FilesCompleter(
-                        allowednames=(".png", ".jpg", ".jpeg"))
+                            default=None,
+                            help="Input image for contouring"
+                           ).completer = argcomplete.completers.FilesCompleter(
+                               allowednames=(".png", ".jpg", ".jpeg"))
 
         parser.add_argument("--lines",
                             type=int,
