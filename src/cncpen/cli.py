@@ -66,7 +66,7 @@ def parse_args() -> argparse.Namespace:
         # General fill arguments
         pattern_parser.add_argument("--spacing",
                                     type=float,
-                                    default=1.0,
+                                    default=2.0,
                                     help="Distance between fill lines")
         pattern_parser.add_argument("--angle",
                                     type=float,
