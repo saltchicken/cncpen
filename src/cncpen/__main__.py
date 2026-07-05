@@ -83,9 +83,6 @@ def process_fills(closed_polys: List[Polygon],
     max_r = math.hypot(global_maxx - global_minx,
                        global_maxy - global_miny) / 2.0
 
-    if getattr(args, 'image', None):
-        args.sampler = ImageSampler(args.image, (global_minx, global_miny, global_maxx, global_maxy))
-
     # Initialize RenderContext for plugins
     context = RenderContext(args=args,
                             boundary=working_poly,

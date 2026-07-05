@@ -39,6 +39,11 @@ class PhotoConcentricFill:
         spacing = context.args.spacing
         threshold = getattr(context.args, 'threshold', 0.5)
         resolution = getattr(context.args, 'resolution', 0.25)
+        image_path = getattr(context.args, 'image', None)
+
+        if not sampler and image_path:
+            sampler = ImageSampler(image_path, context.bounds)
+
         if not sampler:
             return []
 

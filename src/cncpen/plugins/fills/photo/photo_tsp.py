@@ -7,6 +7,7 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from cncpen import ImageSampler
 from cncpen import register_fill
 
 
@@ -30,6 +31,11 @@ class PhotoTSPFill:
                  context: 'RenderContext') -> List[LineString]:
         nodes = getattr(context.args, 'nodes', 2000)
         sampler = getattr(context.args, 'sampler', None)
+        image_path = getattr(context.args, 'image', None)
+
+        if not sampler and image_path:
+            sampler = ImageSampler(image_path, context.bounds)
+
         if not sampler:
             return []
 

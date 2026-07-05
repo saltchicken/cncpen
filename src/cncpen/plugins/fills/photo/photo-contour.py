@@ -50,6 +50,10 @@ class PhotoContourFill:
         levels = getattr(context.args, 'levels', 15)
         resolution = getattr(context.args, 'resolution', 0.5)
         min_length = getattr(context.args, 'min_length', 2.0)
+        image_path = getattr(context.args, 'image', None)
+
+        if not sampler and image_path:
+            sampler = ImageSampler(image_path, context.bounds)
 
         if not sampler:
             return []
