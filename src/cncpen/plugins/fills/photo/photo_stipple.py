@@ -26,11 +26,10 @@ class PhotoStippleFill:
                             default=5000,
                             help="Target number of stipple dots")
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 dots: int = 5000,
-                 sampler=None,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        dots = getattr(context.args, 'dots', 5000)
+        sampler = getattr(context.args, 'sampler', None)
         if not sampler:
             return []
 

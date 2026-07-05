@@ -27,11 +27,10 @@ class PhotoTSPFill:
                             default=2000,
                             help="Number of nodes to connect")
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 nodes: int = 2000,
-                 sampler=None,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        nodes = getattr(context.args, 'nodes', 2000)
+        sampler = getattr(context.args, 'sampler', None)
         if not sampler:
             return []
 

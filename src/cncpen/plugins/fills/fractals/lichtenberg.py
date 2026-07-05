@@ -27,11 +27,10 @@ class LichtenbergFill:
             help="Number of branches/nodes for Lichtenberg fill (default: 1500)"
         )
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 spacing: float,
-                 nodes: int = 1500,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.args.spacing
+        nodes = getattr(context.args, 'nodes', 1500)
         minx, miny, maxx, maxy = shape.bounds
         root = shape.centroid
 

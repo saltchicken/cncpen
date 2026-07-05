@@ -5,7 +5,9 @@ from typing import List
 import argcomplete
 from shapely.geometry import LineString
 
-from cncpen import ImageSampler, RenderContext, register_modification
+from cncpen import ImageSampler
+from cncpen import register_modification
+from cncpen import RenderContext
 
 
 @register_modification("image_mask")
@@ -13,24 +15,21 @@ class ImageMaskMod:
 
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument(
-            "--mask-image",
-            default=None,
-            help="Optional image to modulate fill"
-        ).completer = argcomplete.completers.FilesCompleter(
-            allowednames=(".png", ".jpg", ".jpeg")
-        )
-        group.add_argument(
-            "--threshold",
-            type=float,
-            default=0.5,
-            help="Darkness cutoff"
-        )
+        group.add_argument("--mask-image",
+                           default=None,
+                           help="Optional image to modulate fill"
+                          ).completer = argcomplete.completers.FilesCompleter(
+                              allowednames=(".png", ".jpg", ".jpeg"))
+        group.add_argument("--threshold",
+                           type=float,
+                           default=0.5,
+                           help="Darkness cutoff")
 
     def is_active(self, args: argparse.Namespace) -> bool:
         return bool(getattr(args, 'mask_image', None))
 
-    def apply(self, lines: List[LineString], context: RenderContext) -> List[LineString]:
+    def apply(self, lines: List[LineString],
+              context: RenderContext) -> List[LineString]:
         if not context.args.mask_image:
             return lines
 

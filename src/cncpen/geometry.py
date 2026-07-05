@@ -2,7 +2,8 @@ import math
 from typing import Any, List, Tuple
 
 from shapely import affinity
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString
+from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
 

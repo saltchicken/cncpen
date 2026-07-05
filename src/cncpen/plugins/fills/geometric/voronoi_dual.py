@@ -37,26 +37,22 @@ class VoronoiDualFill:
             "Which edges to draw: 'voronoi', 'delaunay', or 'dual' for both. (default: dual)"
         )
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 spacing: float,
-                 num_points: int = 0,
-                 seed: int = 42,
-                 mode: str = "dual",
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.args.spacing
+        num_points = getattr(context.args, 'num_points', 0)
+        seed = getattr(context.args, 'seed', 42)
+        mode = getattr(context.args, 'mode', 'dual')
         lines = []
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny
 
-        # Bail out if the shape is functionally empty
         if width <= 0 or height <= 0:
             return []
 
-        # Auto-calculate point count if the user didn't explicitly set it
         if num_points <= 0:
             area = width * height
-            # Enforce a minimum spacing to prevent memory overflow on dense requested patterns
             safe_spacing = max(0.2, spacing)
             num_points = max(4, int(area / (safe_spacing**2)))
 

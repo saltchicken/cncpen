@@ -21,10 +21,9 @@ class HexagonFill:
             default=3.0,
             help="Radius (center to vertex) of the hexagons (default: 3.0)")
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 radius: float = 3.0,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        radius = getattr(context.args, 'radius', 3.0)
         minx, miny, maxx, maxy = shape.bounds
 
         if radius <= 0:

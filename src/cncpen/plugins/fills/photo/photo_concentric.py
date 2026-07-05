@@ -33,17 +33,13 @@ class PhotoConcentricFill:
         )
         # Note: --spacing and --threshold are already provided by your global CLI
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 sampler: ImageSampler = None,
-                 spacing: float = 1.0,
-                 threshold: float = 0.5,
-                 resolution: float = 0.25,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        sampler = getattr(context.args, 'sampler', None)
+        spacing = context.args.spacing
+        threshold = getattr(context.args, 'threshold', 0.5)
+        resolution = getattr(context.args, 'resolution', 0.25)
         if not sampler:
-            print(
-                "Warning: 'photo-concentric' requires an --image argument. Returning empty fill."
-            )
             return []
 
         minx, miny, maxx, maxy = shape.bounds

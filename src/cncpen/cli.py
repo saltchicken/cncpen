@@ -6,7 +6,8 @@ from typing import Any
 
 import argcomplete
 
-from cncpen import FILL_REGISTRY, MODIFICATION_REGISTRY
+from cncpen import FILL_REGISTRY
+from cncpen import MODIFICATION_REGISTRY
 
 
 def load_plugins() -> None:

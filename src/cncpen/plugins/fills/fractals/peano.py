@@ -17,8 +17,9 @@ class PeanoFill:
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         pass
 
-    def generate(self, shape: BaseGeometry, spacing: float,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.args.spacing
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny

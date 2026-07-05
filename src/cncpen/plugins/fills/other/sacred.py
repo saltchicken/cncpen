@@ -18,10 +18,10 @@ class SacredFill:
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         pass
 
-    def generate(self, shape: BaseGeometry, spacing: float,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        radius = max(context.args.spacing, 0.1)
         minx, miny, maxx, maxy = shape.bounds
-        radius = max(spacing, 0.1)
         dx = radius
         dy = radius * math.sqrt(3) / 2.0
 

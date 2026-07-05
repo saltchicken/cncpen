@@ -19,10 +19,9 @@ class GridFill:
                             default=2.0,
                             help="Size of the grid squares (default: 2.0)")
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 cell_size: float = 2.0,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        cell_size = getattr(context.args, 'cell_size', 2.0)
         minx, miny, maxx, maxy = shape.bounds
 
         if cell_size <= 0:

@@ -1,10 +1,11 @@
-import sys
 from pathlib import Path
+import sys
 from typing import List, Tuple, Union
 
 import ezdxf
 from ezdxf.path import make_path
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 from shapely.ops import linemerge
 
 

@@ -28,12 +28,11 @@ class ZentangleFill:
             "Base resolution of internal textures. Lower = tighter drawing (default: 3.0)",
         )
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 spacing: float,
-                 density: float = 3.0,
-                 sampler=None,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.args.spacing
+        density = getattr(context.args, 'density', 3.0)
+        sampler = getattr(context.args, 'sampler', None)
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
 

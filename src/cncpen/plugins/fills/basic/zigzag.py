@@ -4,7 +4,8 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import RenderContext, register_fill
+from cncpen import register_fill
+from cncpen import RenderContext
 
 
 @register_fill("zigzag")
@@ -14,7 +15,8 @@ class ZigZagFill:
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         pass
 
-    def generate(self, shape: BaseGeometry, context: RenderContext) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         spacing = context.args.spacing
         y = miny + spacing
@@ -22,7 +24,9 @@ class ZigZagFill:
         left_to_right = True
 
         while y <= maxy:
-            x_start, x_end = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
+            x_start, x_end = (minx - 1,
+                              maxx + 1) if left_to_right else (maxx + 1,
+                                                               minx - 1)
             lines.append(LineString([(x_start, y), (x_end, y)]))
             y += spacing
             left_to_right = not left_to_right

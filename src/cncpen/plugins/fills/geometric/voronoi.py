@@ -25,11 +25,10 @@ class VoronoiFill:
             default=500,
             help="Number of seed points for the Voronoi diagram (default: 500)")
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 sites: int = 500,
-                 sampler=None,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        sites = getattr(context.args, 'sites', 500)
+        sampler = getattr(context.args, 'sampler', None)
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny
@@ -41,8 +40,6 @@ class VoronoiFill:
         attempts = 0
         max_attempts = sites * 10
 
-        # 1. Generate seed points (sites).
-        # If an image sampler is present, heavily weight site generation toward dark areas.
         while len(points) < sites and attempts < max_attempts:
             attempts += 1
             actual_x = minx + random.uniform(0, width)

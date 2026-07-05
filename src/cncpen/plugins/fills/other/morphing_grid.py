@@ -34,13 +34,12 @@ class MorphingGridFill:
             "Number of complete waveform morph cycles (ignored if --image is used)"
         )
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 spacing: float,
-                 cell_size: float = 5.0,
-                 morph_cycles: float = 1.0,
-                 sampler=None,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.args.spacing
+        cell_size = getattr(context.args, 'cell_size', 5.0)
+        morph_cycles = getattr(context.args, 'morph_cycles', 1.0)
+        sampler = getattr(context.args, 'sampler', None)
 
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

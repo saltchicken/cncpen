@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from typing import Any, List, Protocol
 
 from PIL import Image
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString
+from shapely.geometry import Point
+from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
 FILL_REGISTRY = {}
@@ -70,7 +72,8 @@ class FillPattern(Protocol):
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         ...
 
-    def generate(self, shape: BaseGeometry, context: RenderContext) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
         ...
 
 
@@ -83,5 +86,6 @@ class PathModification(Protocol):
     def is_active(self, args: argparse.Namespace) -> bool:
         ...
 
-    def apply(self, lines: List[LineString], context: RenderContext) -> List[LineString]:
+    def apply(self, lines: List[LineString],
+              context: RenderContext) -> List[LineString]:
         ...

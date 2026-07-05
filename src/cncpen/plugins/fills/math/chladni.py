@@ -41,15 +41,14 @@ class ChladniFill:
             default=0.5,
             help="Grid sampling resolution for tracing lines (default: 0.5)")
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 n: float = 3.0,
-                 m: float = 5.0,
-                 sign: float = -1.0,
-                 res: float = 0.5,
-                 sampler=None,
-                 simplify: float = 0.0,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        n = getattr(context.args, 'n', 3.0)
+        m = getattr(context.args, 'm', 5.0)
+        sign = getattr(context.args, 'sign', -1.0)
+        res = getattr(context.args, 'res', 0.5)
+        simplify = context.args.simplify
+        sampler = getattr(context.args, 'sampler', None)
 
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
@@ -58,7 +57,6 @@ class ChladniFill:
         if width <= 0 or height <= 0:
             return []
 
-        # Enforce a minimum resolution to prevent memory exhaustion on massive shapes
         grid_res = max(res, 0.1)
 
         cols = int(math.ceil(width / grid_res)) + 1

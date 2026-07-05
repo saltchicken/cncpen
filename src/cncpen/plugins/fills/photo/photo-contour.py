@@ -44,18 +44,14 @@ class PhotoContourFill:
             "Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
         )
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 sampler: ImageSampler = None,
-                 levels: int = 1,
-                 resolution: float = 0.5,
-                 min_length: float = 2.0,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        sampler = getattr(context.args, 'sampler', None)
+        levels = getattr(context.args, 'levels', 15)
+        resolution = getattr(context.args, 'resolution', 0.5)
+        min_length = getattr(context.args, 'min_length', 2.0)
 
         if not sampler:
-            print(
-                "Warning: 'photo-contour' requires an --image argument. Returning empty fill."
-            )
             return []
 
         minx, miny, maxx, maxy = shape.bounds

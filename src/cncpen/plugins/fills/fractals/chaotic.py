@@ -40,13 +40,12 @@ class ChaoticFill:
             "Amplitude/intensity of the spatial warp for chaotic fill (default: 0.8)"
         )
 
-    def generate(self,
-                 shape: BaseGeometry,
-                 spacing: float,
-                 depth: int = 4,
-                 chaos_freq: float = 0.15,
-                 chaos_amp: float = 0.8,
-                 **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry,
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.args.spacing
+        depth = getattr(context.args, 'depth', 4)
+        chaos_freq = getattr(context.args, 'chaos_freq', 0.15)
+        chaos_amp = getattr(context.args, 'chaos_amp', 0.8)
 
         minx, miny, maxx, maxy = shape.bounds
         coarse_spacing = max(spacing * 4.0, 1.0)
