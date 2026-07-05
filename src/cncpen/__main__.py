@@ -8,9 +8,9 @@ import os
 import random
 import sys
 from dataclasses import dataclass
-from functools import reduce
+from functools import partial, reduce
 from pathlib import Path
-from typing import Any, List, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, List, Optional, Protocol, Tuple, Union
 
 import argcomplete
 import ezdxf
@@ -22,6 +22,8 @@ from shapely.geometry import LineString, MultiLineString, Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
 
+# Define a type alias for our pipeline filters
+PathFilter = Callable[[List[LineString]], List[LineString]]
 
 class DXFReadError(Exception):
     """Raised when a DXF file cannot be successfully read or parsed."""
@@ -150,7 +152,6 @@ def roughen_line(line: LineString,
     wiggled_coords.append(points[-1])
     return LineString(wiggled_coords)
 
-
 def _extract_lines(geometry: BaseGeometry) -> List[LineString]:
     if geometry.is_empty:
         return []
@@ -249,7 +250,6 @@ def apply_transform(lines: List[LineString], angle: float, origin: Any,
 
     return transformed_lines
 
-
 FILL_REGISTRY = {}
 
 def register_fill(name):
@@ -291,49 +291,6 @@ def _ensure_geom(shape):
     poly = shape if isinstance(shape, BaseGeometry) else (
         Polygon() if len(shape) < 4 else Polygon(shape))
     return poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
-
-def generate_pipeline(filler,
-                      shape,
-                      angle=0.0,
-                      fisheye=0.0,
-                      image=None,
-                      simplify=0.0,
-                      **kwargs) -> List[LineString]:
-    poly = _ensure_geom(shape)
-    if poly.is_empty or poly.area == 0:
-        return []
-
-    centroid = poly.centroid
-    working_poly = affinity.rotate(poly, -angle,
-                                   origin=centroid) if angle != 0.0 else poly
-
-    global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
-    max_r = math.hypot(global_maxx - global_minx,
-                       global_maxy - global_miny) / 2.0
-    sampler = ImageSampler(image, working_poly.bounds) if image else None
-
-    lines = []
-    polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(
-        working_poly.geoms)
-    for p in polygons:
-        lines.extend(filler.generate(p, sampler=sampler, **kwargs))
-
-    lines = [line for line in lines if not line.is_empty]
-
-    if sampler and not getattr(filler, 'handles_image_natively', False):
-        lines = apply_image_mask(lines, sampler, kwargs.get('threshold', 0.1))
-
-    if kwargs.get('roughen_amp', 0.0) > 0.0:
-        lines = apply_roughening(lines, kwargs['roughen_amp'],
-                                 kwargs.get('roughen_step', 1.0))
-
-    if fisheye != 0.0:
-        lines = apply_fisheye(lines, fisheye, centroid, max_r)
-
-    lines = apply_clipping(lines, working_poly)
-    lines = apply_transform(lines, angle, centroid, simplify)
-
-    return lines
 
 # === BUILT-IN PLUGINS ===
 
@@ -531,11 +488,52 @@ def main() -> None:
 
             if fill_class:
                 filler = fill_class()
-                final_lines = generate_pipeline(filler, combined_geom, **vars(args))
+                
+                # Setup base geometry constraints
+                poly = _ensure_geom(combined_geom)
+                if not poly.is_empty and poly.area > 0:
+                    centroid = poly.centroid
+                    angle = args.angle
+                    
+                    working_poly = affinity.rotate(poly, -angle, origin=centroid) if angle != 0.0 else poly
+                    global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
+                    max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
+                    
+                    sampler = ImageSampler(args.image, working_poly.bounds) if args.image else None
+
+                    # 1. Generate base lines
+                    lines = []
+                    polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
+                    for p in polygons:
+                        lines.extend(filler.generate(p, sampler=sampler, **vars(args)))
+
+                    lines = [line for line in lines if not line.is_empty]
+
+                    # 2. Declare the declarative filter pipeline
+                    needs_mask = sampler and not getattr(filler, 'handles_image_natively', False)
+                    roughen_amp = getattr(args, 'roughen_amp', 0.0)
+                    fisheye = getattr(args, 'fisheye', 0.0)
+                    
+                    pipeline: List[Optional[PathFilter]] = [
+                        partial(apply_image_mask, sampler=sampler, threshold=args.threshold) if needs_mask else None,
+                        partial(apply_roughening, amplitude=roughen_amp, step=args.roughen_step) if roughen_amp > 0.0 else None,
+                        partial(apply_fisheye, factor=fisheye, centroid=centroid, max_r=max_r) if fisheye != 0.0 else None,
+                        partial(apply_clipping, boundary=working_poly),
+                        partial(apply_transform, angle=angle, origin=centroid, simplify_tol=getattr(args, 'simplify', 0.0))
+                    ]
+
+                    # 3. Execute active filters sequentially
+                    active_filters = filter(None, pipeline)
+                    for apply_filter in active_filters:
+                        lines = apply_filter(lines)
+                    
+                    final_lines = lines
+                else:
+                    final_lines = []
 
                 raw_fill_coords = [list(line.coords) for line in final_lines]
 
-                if not args.no_optimize:
+                if not args.no_optimize and raw_fill_coords:
                     print(f"Optimizing {args.pattern} fill paths...")
                     last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
                     raw_fill_coords = optimize_paths_nearest_neighbor(
