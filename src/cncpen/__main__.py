@@ -107,7 +107,10 @@ def process_fills(closed_polys: List[Polygon],
         if mod.is_active(args):
             lines = mod.apply(lines, context)
 
-    # 4. Transform Output (Rotation & Simplify)
+    # 4. Apply clipping again AFTER modifications
+    lines = apply_clipping(lines, boundary=working_poly)
+
+    # 5. Transform Output (Rotation & Simplify)
     lines = apply_transform(lines,
                             angle=angle,
                             origin=centroid,
