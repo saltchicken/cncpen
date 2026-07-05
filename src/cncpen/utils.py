@@ -162,11 +162,3 @@ def roughen_line(line: LineString, segment_length: float = 1.0, amplitude: float
 
     wiggled_coords.append(points[-1])
     return LineString(wiggled_coords)
-
-def roughen_coords(points: List[Tuple[float, float]], segment_length: float, amplitude: float) -> List[Tuple[float, float]]:
-    """Wrapper to safely apply roughening directly to raw coordinate lists."""
-    if amplitude <= 0 or len(points) < 2:
-        return points
-        
-    line = LineString(points)
-    return list(roughen_line(line, segment_length, amplitude).coords)

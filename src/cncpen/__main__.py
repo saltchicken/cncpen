@@ -11,7 +11,7 @@ from shapely.geometry import Polygon
 from .cli import parse_args
 from .fills import FILL_REGISTRY, load_plugins, generate_pipeline
 from .machine import PenConfig, PenTool
-from .utils import DXFReadError, extract_dxf_paths, optimize_paths_nearest_neighbor, roughen_coords
+from .utils import DXFReadError, extract_dxf_paths, optimize_paths_nearest_neighbor
 
 
 def main() -> None:
@@ -52,8 +52,7 @@ def main() -> None:
         # --- OUTLINE DRAWING ---
         for pts in paths_to_draw:
             if not args.no_outline:
-                drawn_pts = roughen_coords(pts, args.roughen_step, args.roughen_amp) if args.roughen_amp > 0 else pts
-                pen.draw_path(drawn_pts, clearance=True)
+                pen.draw_path(pts, clearance=True)
 
             if args.pattern and len(pts) > 2:
                 dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
