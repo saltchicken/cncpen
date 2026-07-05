@@ -254,7 +254,6 @@ class PenTool:
 
 
 def parse_args() -> argparse.Namespace:
-    # Discover and register all plugins automatically before building the parser
     load_plugins()
 
     parser = argparse.ArgumentParser(
@@ -322,13 +321,132 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def main() -> None:
-    args = parse_args()
-
+def print_run_parameters(args: argparse.Namespace) -> None:
+    """Prints the runtime arguments to the console."""
     print("--- Run Parameters ---")
     for key, value in vars(args).items():
         print(f"{key}: {value}")
     print("----------------------\n")
+
+
+def process_outlines(
+    paths_to_draw: List[List[Tuple[float, float]]],
+    args: argparse.Namespace,
+    pen: PenTool
+) -> List[Polygon]:
+    """Draws outlines and extracts closed polygons to be used as fill boundaries."""
+    closed_polys: List[Polygon] = []
+    
+    for pts in paths_to_draw:
+        if not args.no_outline:
+            pen.draw_path(pts, clearance=True)
+
+        if args.pattern and len(pts) > 2:
+            dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
+            if math.hypot(dx, dy) < 0.01:
+                poly = Polygon(pts)
+                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
+                if poly.area > 0:
+                    closed_polys.append(poly)
+                    
+    return closed_polys
+
+
+def process_fills(
+    closed_polys: List[Polygon],
+    paths_to_draw: List[List[Tuple[float, float]]],
+    args: argparse.Namespace,
+    pen: PenTool
+) -> None:
+    """Handles geometry extraction, sampling, modifications, and generation for fill patterns."""
+    if not args.pattern or not closed_polys:
+        return
+
+    combined_geom = reduce(operator.xor, closed_polys)
+    fill_class = FILL_REGISTRY.get(args.pattern)
+
+    if not fill_class:
+        return
+
+    filler = fill_class()
+
+    # Setup base geometry constraints
+    poly = _ensure_geom(combined_geom)
+    if poly.is_empty or poly.area <= 0:
+        return
+
+    centroid = poly.centroid
+    angle = getattr(args, 'angle', 0.0)
+
+    working_poly = affinity.rotate(poly, -angle, origin=centroid) if angle != 0.0 else poly
+    global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
+    max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
+
+    fill_img_path = getattr(args, 'image', None)
+    fill_sampler = ImageSampler(fill_img_path, working_poly.bounds) if fill_img_path else None
+
+    mask_img_path = getattr(args, 'mask_image', None)
+    mask_sampler = ImageSampler(mask_img_path, working_poly.bounds) if mask_img_path else None
+
+    # 1. Generate base lines
+    lines = []
+    polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
+    for p in polygons:
+        lines.extend(filler.generate(p, sampler=fill_sampler, **vars(args)))
+
+    lines = [line for line in lines if not line.is_empty]
+
+    # 2. Apply Modification Plugins (Hardcoded execution order)
+    hardcoded_mod_pipeline = ["image_mask", "roughen", "fisheye"]
+
+    for mod_name in hardcoded_mod_pipeline:
+        mod_class = MODIFICATION_REGISTRY.get(mod_name)
+        if mod_class:
+            mod = mod_class()
+            if mod.is_active(args):
+                lines = mod.apply(
+                    lines=lines,
+                    args=args,
+                    mask_sampler=mask_sampler,
+                    centroid=centroid,
+                    max_r=max_r
+                )
+
+    # 3. Core Geometric Filters (Clipping & Transform)
+    lines = apply_clipping(lines, boundary=working_poly)
+    lines = apply_transform(
+        lines,
+        angle=angle,
+        origin=centroid,
+        simplify_tol=getattr(args, 'simplify', 0.0)
+    )
+
+    raw_fill_coords = [list(line.coords) for line in lines]
+
+    # 4. Optimize and draw
+    if not args.no_optimize and raw_fill_coords:
+        print(f"Optimizing {args.pattern} fill paths...")
+        last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
+        raw_fill_coords = optimize_paths_nearest_neighbor(raw_fill_coords, start_pt=last_pos)
+
+    for f_pts in raw_fill_coords:
+        pen.draw_path(f_pts, clearance=False)
+
+
+def print_post_run_stats(output_filename: str) -> None:
+    """Reads the generated file to print out runtime statistics."""
+    try:
+        with open(output_filename, 'r') as f:
+            print(f"\nTotal G-code lines produced: {sum(1 for _ in f)}")
+    except Exception as e:
+        print(f"\nCould not count lines in output file: {e}")
+
+    print(f"G-code successfully saved to {output_filename}")
+
+
+def main() -> None:
+    args = parse_args()
+    print_run_parameters(args)
 
     print(f"Reading geometry from {args.dxf_file}...")
 
@@ -350,116 +468,12 @@ def main() -> None:
         sys.exit(0)
 
     config = PenConfig(feed_rate=args.feed)
-    closed_polys: List[Polygon] = []
 
     with PenTool(config, output_filename=args.output) as pen:
+        closed_polys = process_outlines(paths_to_draw, args, pen)
+        process_fills(closed_polys, paths_to_draw, args, pen)
 
-        # --- OUTLINE DRAWING ---
-        for pts in paths_to_draw:
-            if not args.no_outline:
-                pen.draw_path(pts, clearance=True)
-
-            if args.pattern and len(pts) > 2:
-                dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
-                if math.hypot(dx, dy) < 0.01:
-                    poly = Polygon(pts)
-                    poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(
-                        0)
-                    if poly.area > 0:
-                        closed_polys.append(poly)
-
-        # --- FILL DRAWING ---
-        if args.pattern and closed_polys:
-            combined_geom = reduce(operator.xor, closed_polys)
-            fill_class = FILL_REGISTRY.get(args.pattern)
-
-            if fill_class:
-                filler = fill_class()
-
-                # Setup base geometry constraints
-                poly = _ensure_geom(combined_geom)
-                if not poly.is_empty and poly.area > 0:
-                    centroid = poly.centroid
-                    angle = getattr(args, 'angle', 0.0)
-
-                    working_poly = affinity.rotate(
-                        poly, -angle, origin=centroid) if angle != 0.0 else poly
-                    global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
-                    max_r = math.hypot(global_maxx - global_minx,
-                                       global_maxy - global_miny) / 2.0
-
-                    fill_img_path = getattr(args, 'image', None)
-                    fill_sampler = ImageSampler(
-                        fill_img_path,
-                        working_poly.bounds) if fill_img_path else None
-
-                    mask_img_path = getattr(args, 'mask_image', None)
-                    mask_sampler = ImageSampler(
-                        mask_img_path,
-                        working_poly.bounds) if mask_img_path else None
-
-                    # 1. Generate base lines
-                    lines = []
-                    polygons = [
-                        working_poly
-                    ] if working_poly.geom_type == 'Polygon' else list(
-                        working_poly.geoms)
-                    for p in polygons:
-                        lines.extend(
-                            filler.generate(p,
-                                            sampler=fill_sampler,
-                                            **vars(args)))
-
-                    lines = [line for line in lines if not line.is_empty]
-
-                    # 2. Apply Modification Plugins (Hardcoded execution order)
-                    hardcoded_mod_pipeline = [
-                        "image_mask", "roughen", "fisheye"
-                    ]
-
-                    for mod_name in hardcoded_mod_pipeline:
-                        mod_class = MODIFICATION_REGISTRY.get(mod_name)
-                        if mod_class:
-                            mod = mod_class()
-                            if mod.is_active(args):
-                                lines = mod.apply(lines=lines,
-                                                  args=args,
-                                                  mask_sampler=mask_sampler,
-                                                  centroid=centroid,
-                                                  max_r=max_r)
-
-                    # 3. Core Geometric Filters (Clipping & Transform)
-                    lines = apply_clipping(lines, boundary=working_poly)
-                    lines = apply_transform(lines,
-                                            angle=angle,
-                                            origin=centroid,
-                                            simplify_tol=getattr(
-                                                args, 'simplify', 0.0))
-
-                    final_lines = lines
-                else:
-                    final_lines = []
-
-                raw_fill_coords = [list(line.coords) for line in final_lines]
-
-                if not args.no_optimize and raw_fill_coords:
-                    print(f"Optimizing {args.pattern} fill paths...")
-                    last_pos = (
-                        0.0,
-                        0.0) if not paths_to_draw else paths_to_draw[-1][-1]
-                    raw_fill_coords = optimize_paths_nearest_neighbor(
-                        raw_fill_coords, start_pt=last_pos)
-
-                for f_pts in raw_fill_coords:
-                    pen.draw_path(f_pts, clearance=False)
-
-    try:
-        with open(args.output, 'r') as f:
-            print(f"\nTotal G-code lines produced: {sum(1 for _ in f)}")
-    except Exception as e:
-        print(f"\nCould not count lines in output file: {e}")
-
-    print(f"G-code successfully saved to {args.output}")
+    print_post_run_stats(args.output)
 
 
 if __name__ == "__main__":
