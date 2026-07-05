@@ -1,8 +1,9 @@
 import argparse
+from dataclasses import dataclass
 from typing import Any, List, Protocol
 
 from PIL import Image
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.base import BaseGeometry
 
 FILL_REGISTRY = {}
@@ -50,13 +51,26 @@ class ImageSampler:
         return (255 - self.img.getpixel((px, py))) / 255.0
 
 
+@dataclass
+class RenderContext:
+    """Holds read-only state for the current fill operation."""
+    args: argparse.Namespace
+    boundary: Polygon
+    centroid: Point
+    max_r: float
+
+    @property
+    def bounds(self) -> tuple[float, float, float, float]:
+        return self.boundary.bounds
+
+
 class FillPattern(Protocol):
 
     @classmethod
     def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
         ...
 
-    def generate(self, shape: BaseGeometry, **kwargs: Any) -> List[LineString]:
+    def generate(self, shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         ...
 
 
@@ -69,6 +83,5 @@ class PathModification(Protocol):
     def is_active(self, args: argparse.Namespace) -> bool:
         ...
 
-    def apply(self, lines: List[LineString], args: argparse.Namespace,
-              **kwargs: Any) -> List[LineString]:
+    def apply(self, lines: List[LineString], context: RenderContext) -> List[LineString]:
         ...

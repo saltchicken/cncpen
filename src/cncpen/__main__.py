@@ -11,7 +11,7 @@ from typing import List, Tuple
 from shapely import affinity
 from shapely.geometry import Polygon
 
-from cncpen import FILL_REGISTRY, MODIFICATION_REGISTRY, ImageSampler
+from cncpen import FILL_REGISTRY, MODIFICATION_REGISTRY, RenderContext
 from cncpen.cli import parse_args, print_run_parameters
 from cncpen.dxf import DXFReadError, extract_dxf_paths
 from cncpen.geometry import (_ensure_geom, apply_clipping, apply_transform,
@@ -52,7 +52,12 @@ def process_fills(
     if not args.pattern or not closed_polys:
         return
 
-    combined_geom = reduce(operator.xor, closed_polys)
+    try:
+        combined_geom = reduce(operator.xor, closed_polys)
+    except BaseException as e:
+        print(f"Warning: Failed to boolean XOR boundary polygons: {e}", file=sys.stderr)
+        return
+
     fill_class = FILL_REGISTRY.get(args.pattern)
 
     if not fill_class:
@@ -72,38 +77,32 @@ def process_fills(
     global_minx, global_miny, global_maxx, global_maxy = working_poly.bounds
     max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
 
-    fill_img_path = getattr(args, 'image', None)
-    fill_sampler = ImageSampler(fill_img_path, working_poly.bounds) if fill_img_path else None
-
-    mask_img_path = getattr(args, 'mask_image', None)
-    mask_sampler = ImageSampler(mask_img_path, working_poly.bounds) if mask_img_path else None
+    # Initialize RenderContext for plugins
+    context = RenderContext(
+        args=args,
+        boundary=working_poly,
+        centroid=centroid,
+        max_r=max_r
+    )
 
     # 1. Generate base lines
     lines = []
     polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
     for p in polygons:
-        lines.extend(filler.generate(p, sampler=fill_sampler, **vars(args)))
+        lines.extend(filler.generate(p, context))
 
     lines = [line for line in lines if not line.is_empty]
 
-    # 2. Apply Modification Plugins (Hardcoded execution order)
-    hardcoded_mod_pipeline = ["image_mask", "roughen", "fisheye"]
-
-    for mod_name in hardcoded_mod_pipeline:
-        mod_class = MODIFICATION_REGISTRY.get(mod_name)
-        if mod_class:
-            mod = mod_class()
-            if mod.is_active(args):
-                lines = mod.apply(
-                    lines=lines,
-                    args=args,
-                    mask_sampler=mask_sampler,
-                    centroid=centroid,
-                    max_r=max_r
-                )
-
-    # 3. Core Geometric Filters (Clipping & Transform)
+    # 2. Clip lines against boundary (Performance: do this BEFORE modifications)
     lines = apply_clipping(lines, boundary=working_poly)
+
+    # 3. Apply Modification Plugins (Dynamic execution)
+    for mod_name, mod_class in MODIFICATION_REGISTRY.items():
+        mod = mod_class()
+        if mod.is_active(args):
+            lines = mod.apply(lines, context)
+
+    # 4. Transform Output (Rotation & Simplify)
     lines = apply_transform(
         lines,
         angle=angle,
@@ -113,7 +112,7 @@ def process_fills(
 
     raw_fill_coords = [list(line.coords) for line in lines]
 
-    # 4. Optimize and draw
+    # 5. Optimize and draw
     if not args.no_optimize and raw_fill_coords:
         print(f"Optimizing {args.pattern} fill paths...")
         last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
