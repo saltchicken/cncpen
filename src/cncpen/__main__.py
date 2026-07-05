@@ -172,13 +172,9 @@ def register_fill(name):
     return decorator
 
 
-def register_modification(name, priority: int = 50):
-    """
-    Priority determines the order of execution in the pipeline.
-    Lower numbers are executed first (e.g., 10 executes before 50).
-    """
+def register_modification(name):
     def decorator(cls):
-        MODIFICATION_REGISTRY[name] = (cls, priority)
+        MODIFICATION_REGISTRY[name] = cls
         return cls
     return decorator
 
@@ -234,7 +230,7 @@ def _ensure_geom(shape):
 
 # === MODIFICATION PLUGINS ===
 
-@register_modification("image_mask", priority=10)
+@register_modification("image_mask")
 class ImageMaskMod:
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
@@ -274,7 +270,7 @@ class ImageMaskMod:
         return masked_lines
 
 
-@register_modification("roughen", priority=20)
+@register_modification("roughen")
 class RoughenMod:
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
@@ -320,7 +316,7 @@ class RoughenMod:
         return LineString(wiggled_coords)
 
 
-@register_modification("fisheye", priority=30)
+@register_modification("fisheye")
 class FisheyeMod:
     @classmethod
     def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
@@ -560,7 +556,7 @@ def parse_args() -> argparse.Namespace:
 
     # Modifications (Main Parser)
     mod_group = parser.add_argument_group("Path Modifications (Plugins)")
-    for mod_name, (mod_class, _) in MODIFICATION_REGISTRY.items():
+    for mod_name, mod_class in MODIFICATION_REGISTRY.items():
         mod_class.setup_cli(mod_group)
 
     # Fills (Subparsers)
@@ -663,18 +659,21 @@ def main() -> None:
 
                     lines = [line for line in lines if not line.is_empty]
 
-                    # 2. Apply Dynamic Modification Plugins
-                    sorted_mods = sorted(MODIFICATION_REGISTRY.values(), key=lambda x: x[1])
-                    for mod_class, _ in sorted_mods:
-                        mod = mod_class()
-                        if mod.is_active(args):
-                            lines = mod.apply(
-                                lines=lines, 
-                                args=args, 
-                                mask_sampler=mask_sampler, 
-                                centroid=centroid, 
-                                max_r=max_r
-                            )
+                    # 2. Apply Modification Plugins (Hardcoded execution order)
+                    hardcoded_mod_pipeline = ["image_mask", "roughen", "fisheye"]
+                    
+                    for mod_name in hardcoded_mod_pipeline:
+                        mod_class = MODIFICATION_REGISTRY.get(mod_name)
+                        if mod_class:
+                            mod = mod_class()
+                            if mod.is_active(args):
+                                lines = mod.apply(
+                                    lines=lines, 
+                                    args=args, 
+                                    mask_sampler=mask_sampler, 
+                                    centroid=centroid, 
+                                    max_r=max_r
+                                )
 
                     # 3. Core Geometric Filters (Clipping & Transform)
                     lines = apply_clipping(lines, boundary=working_poly)
