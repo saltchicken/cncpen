@@ -13,7 +13,6 @@ from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
 from cncpen import RenderContext
 from cncpen.cli import parse_args
-from cncpen.cli import print_run_parameters
 from cncpen.dxf import DXFReadError
 from cncpen.dxf import extract_dxf_paths
 from cncpen.geometry import _ensure_geom
@@ -172,7 +171,6 @@ def print_post_run_stats(output_filename: str) -> None:
 
 def main() -> None:
     config = parse_args()
-    print_run_parameters(config)
 
     print(f"Reading geometry from {config['dxf_file']}...")
 

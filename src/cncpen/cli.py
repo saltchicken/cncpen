@@ -51,12 +51,3 @@ def parse_args() -> dict:
 
     return config
 
-
-def print_run_parameters(config: dict) -> None:
-    """Prints the runtime configuration to the console."""
-    print("--- Run Parameters ---")
-    for key, value in config.items():
-        if key != "fills":
-            print(f"{key}: {value}")
-    print(f"fills: {len(config.get('fills', []))} steps defined")
-    print("----------------------\n")

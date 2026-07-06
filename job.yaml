@@ -1,11 +1,9 @@
 fills:
-  - pattern: concentric
-    spacing: 1.0
+  - pattern: photo-contour
+    image: images/loz.jpg
+    levels: 1
+    resolution: 0.05
 
-  - modification: image_mask
-    mask_image: images/loz.jpg
-    threshold: 0.5
-
-  # - modification: simplify
-  #   tolerance: 0.2
-  #   preserve_topology: false
+  - modification: simplify
+    tolerance: 0.2
+    preserve_topology: false
