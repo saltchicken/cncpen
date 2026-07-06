@@ -130,15 +130,21 @@ def process_fills(closed_polys: List[Polygon],
             working_geom = affinity.rotate(
                 source_geom, -angle, origin=centroid) if angle != 0.0 else source_geom
                 
-            # Always maintain the outer boundary for the context and clipping, 
-            # even if the filler is operating on a set of internal lines.
-            working_boundary = affinity.rotate(
+            overscan = step_def.get('overscan', 0.0)
+
+            # 1. Maintain the strict original boundary for the final master clipping
+            strict_master_boundary = affinity.rotate(
                 poly, -angle, origin=centroid) if angle != 0.0 else poly
+                
+            # 2. Expand the context boundary so plugins generating based on context bounds get the overscan
+            context_boundary_geom = poly.buffer(overscan) if overscan > 0 else poly
+            context_working_boundary = affinity.rotate(
+                context_boundary_geom, -angle, origin=centroid) if angle != 0.0 else context_boundary_geom
 
             context = RenderContext(config=step_config,
-                                    boundary=working_boundary,
+                                    boundary=context_working_boundary,
                                     centroid=centroid,
-                                    max_r=max_r)
+                                    max_r=max_r + overscan)
 
             lines = []
             
@@ -149,10 +155,14 @@ def process_fills(closed_polys: List[Polygon],
             clip_local = step_def.get('clip_local', True)
 
             for g in geoms:
-                step_lines = filler.generate(g, context)
+                # 3. Buffer individual polygons so edge patterns develop fully before clipping
+                gen_shape = g.buffer(overscan) if (overscan > 0 and g.geom_type == 'Polygon') else g
+                
+                step_lines = filler.generate(gen_shape, context)
                 
                 # Clip strictly to the local sub-cell if requested and if it's a closed area
                 if clip_local and g.geom_type == 'Polygon':
+                    # 4. Clip against the ORIGINAL 'g', not the overscanned one!
                     step_lines = apply_clipping(step_lines, boundary=g)
                     
                 lines.extend(step_lines)
@@ -160,7 +170,8 @@ def process_fills(closed_polys: List[Polygon],
             lines = [line for line in lines if not line.is_empty]
             
             # ALWAYS clip against the master boundary to ensure we never ruin the main DXF shape
-            lines = apply_clipping(lines, boundary=working_boundary)
+            # 5. Apply the final slice using the un-buffered boundary
+            lines = apply_clipping(lines, boundary=strict_master_boundary)
             
             lines = apply_transform(lines,
                                     angle=angle,
