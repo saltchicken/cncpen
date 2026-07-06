@@ -29,21 +29,18 @@ logger = logging.getLogger(__name__)
 
 
 def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
-                     config: JobConfig, pen: PenTool) -> List[Polygon]:
-    """Draws outlines and extracts closed polygons to be used as fill boundaries."""
+                     config: JobConfig) -> List[Polygon]:
+    """Extracts closed polygons to be used as fill boundaries."""
     closed_polys: List[Polygon] = []
     has_fills = bool(config.fills)
 
     for pts in paths_to_draw:
-        if not config.no_outline:
-            pen.draw_path(pts, clearance=True)
-
+        # Drawing logic removed; only polygon extraction remains
         if has_fills and len(pts) > 2:
             dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
             if math.hypot(dx, dy) < 0.01:
                 poly = Polygon(pts)
-                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(
-                    0)
+                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
                 if poly.area > 0:
                     closed_polys.append(poly)
 
@@ -183,15 +180,14 @@ def _apply_modification(step_config: StepConfig, active_lines: List[LineString],
     return apply_clipping(active_lines, boundary=poly)
 
 
-def process_fills(closed_polys: List[Polygon], config: JobConfig,
-                  pen: PenTool) -> None:
+def process_fills(closed_polys: List[Polygon], config: JobConfig) -> List[LineString]:
     """Executes the pipeline of fill patterns and modifications."""
     if not closed_polys or not config.fills:
-        return
+        return []
 
     poly = _get_boundary_polygon(closed_polys)
     if not poly:
-        return
+        return []
 
     centroid = poly.centroid
     global_minx, global_miny, global_maxx, global_maxy = poly.bounds
@@ -205,30 +201,22 @@ def process_fills(closed_polys: List[Polygon], config: JobConfig,
         step_timer = time.perf_counter()
 
         if step_config.pattern:
-            logger.info(
-                f"  [{step_idx}/{total_steps}] Executing fill pattern '{step_config.pattern}'..."
-            )
-            active_lines = _apply_pattern(step_config, active_lines, poly,
-                                          centroid, max_r)
+            logger.info(f"  [{step_idx}/{total_steps}] Executing fill pattern '{step_config.pattern}'...")
+            active_lines = _apply_pattern(step_config, active_lines, poly, centroid, max_r)
 
         elif step_config.modification:
-            logger.info(
-                f"  [{step_idx}/{total_steps}] Applying modification '{step_config.modification}'..."
-            )
-            active_lines = _apply_modification(step_config, active_lines, poly,
-                                               centroid, max_r)
+            logger.info(f"  [{step_idx}/{total_steps}] Applying modification '{step_config.modification}'...")
+            active_lines = _apply_modification(step_config, active_lines, poly, centroid, max_r)
 
         else:
-            logger.warning(
-                f"  [{step_idx}/{total_steps}] Step must contain 'pattern' or 'modification'. Ignored."
-            )
+            logger.warning(f"  [{step_idx}/{total_steps}] Step must contain 'pattern' or 'modification'. Ignored.")
             continue
 
         total_vertices = sum(len(line.coords) for line in active_lines)
         logger.info(
             f"    -> Resulting state: {len(active_lines)} lines ({total_vertices} vertices) "
-            f"in {time.perf_counter() - step_timer:.3f}s.")
+            f"in {time.perf_counter() - step_timer:.3f}s."
+        )
 
-    logger.info("  Writing fill paths to G-code...")
-    for line in active_lines:
-        pen.draw_path(list(line.coords), clearance=False)
+    # Return the generated lines instead of drawing them here
+    return active_lines

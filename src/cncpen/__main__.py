@@ -48,14 +48,24 @@ def main() -> None:
 
         logger.info("Processing outlines...")
         step_start = time.perf_counter()
-        closed_polys = process_outlines(paths_to_draw, config, pen)
+        closed_polys = process_outlines(paths_to_draw, config)
+
+        if not config.no_outline:
+            for pts in paths_to_draw:
+                pen.draw_path(pts, clearance=True)
+
         logger.info(
             f"Outlines processed in {time.perf_counter() - step_start:.3f}s.")
 
         logger.info(f"Processing {len(config.fills)} fill steps...")
         step_start = time.perf_counter()
         # Simplified process_fills signature
-        process_fills(closed_polys, config, pen)
+        fill_lines = process_fills(closed_polys, config)
+        if fill_lines:
+            logger.info("Writing fill paths to G-code...")
+            for line in fill_lines:
+                pen.draw_path(list(line.coords), clearance=False)
+
         logger.info(
             f"Fills processed in {time.perf_counter() - step_start:.3f}s.")
 
