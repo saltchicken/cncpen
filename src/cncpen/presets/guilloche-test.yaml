@@ -1,0 +1,29 @@
+globals:
+  outline_simplify: 0.1
+  feed: 1500
+  no_outline: true
+
+fills:
+  # Base geometric shape
+  - pattern: guilloche
+    major_radius: 50.0
+    minor_radius: -17.5  # Negative creates inward loops (hypotrochoid)
+    pen_offset: 25.0
+    revolutions: 35      # High revolutions create dense, interwoven mesh
+    resolution: 0.05
+
+  # Second overlapping pattern for the "banknote" effect
+  - pattern: guilloche
+    major_radius: 40.0
+    minor_radius: 12.0   # Positive creates outward loops (epitrochoid)
+    pen_offset: 15.0
+    revolutions: 10
+    resolution: 0.05
+
+  - modification: simplify
+    tolerance: 0.5
+    preserve_topology: false
+
+  # Traveling salesperson optimization is less critical for single continuous 
+  # lines, but helpful since there are two separate loops in this preset
+  - modification: optimize
