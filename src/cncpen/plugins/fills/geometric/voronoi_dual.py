@@ -39,7 +39,7 @@ class VoronoiDualFill:
 
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = context.args.spacing
+        spacing = getattr(context.args, 'spacing', 2.0)
         num_points = getattr(context.args, 'num_points', 0)
         seed = getattr(context.args, 'seed', 42)
         mode = getattr(context.args, 'mode', 'dual')

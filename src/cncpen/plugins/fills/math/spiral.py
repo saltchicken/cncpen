@@ -25,7 +25,7 @@ class SpiralFill:
 
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = context.args.spacing
+        spacing = getattr(context.args, 'spacing', 2.0)
         resolution = getattr(context.args, 'resolution', 0.5)
 
         # Fallback to prevent infinite loops if invalid arguments are passed

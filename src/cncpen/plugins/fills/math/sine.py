@@ -28,7 +28,7 @@ class SineFill:
 
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = context.args.spacing
+        spacing = getattr(context.args, 'spacing', 2.0)
         amplitude = getattr(context.args, 'amplitude', 1.0)
         wavelength = getattr(context.args, 'wavelength', 5.0)
         sampler = getattr(context.args, 'sampler', None)

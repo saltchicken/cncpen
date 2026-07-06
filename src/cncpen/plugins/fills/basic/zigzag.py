@@ -18,7 +18,7 @@ class ZigZagFill:
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
-        spacing = context.args.spacing
+        spacing = getattr(context.args, 'spacing', 2.0)
         y = miny + spacing
         lines = []
         left_to_right = True

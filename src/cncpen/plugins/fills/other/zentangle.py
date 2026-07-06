@@ -30,7 +30,7 @@ class ZentangleFill:
 
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = context.args.spacing
+        spacing = getattr(context.args, 'spacing', 2.0)
         density = getattr(context.args, 'density', 3.0)
         sampler = getattr(context.args, 'sampler', None)
         minx, miny, maxx, maxy = shape.bounds

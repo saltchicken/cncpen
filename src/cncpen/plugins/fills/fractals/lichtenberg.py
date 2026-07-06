@@ -29,7 +29,7 @@ class LichtenbergFill:
 
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = context.args.spacing
+        spacing = getattr(context.args, 'spacing', 2.0)
         nodes = getattr(context.args, 'nodes', 1500)
         minx, miny, maxx, maxy = shape.bounds
         root = shape.centroid

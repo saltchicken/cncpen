@@ -23,7 +23,7 @@ class ConcentricFill:
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
         lines = []
-        spacing = context.args.spacing
+        spacing = getattr(context.args, 'spacing', 2.0)
         ring_simplify = getattr(context.args, 'ring_simplify', 0.2)
 
         current_geom = shape.buffer(-spacing).simplify(ring_simplify,
