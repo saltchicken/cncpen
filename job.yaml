@@ -5,4 +5,7 @@ fills:
   - modification: image_mask
     mask_image: images/loz.jpg
     threshold: 0.5
-    simplify: 0.2
+
+  # - modification: simplify
+  #   tolerance: 0.2
+  #   preserve_topology: false
