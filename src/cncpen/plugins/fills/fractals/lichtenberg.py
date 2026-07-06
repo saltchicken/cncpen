@@ -18,19 +18,10 @@ class LichtenbergFill:
     (Rapidly-exploring Random Tree) algorithm confined to the polygon.
     """
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--nodes",
-            type=int,
-            default=1500,
-            help="Number of branches/nodes for Lichtenberg fill (default: 1500)"
-        )
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = getattr(context.args, 'spacing', 2.0)
-        nodes = getattr(context.args, 'nodes', 1500)
+        spacing = context.config.get('spacing', 2.0)
+        nodes = context.config.get('nodes', 1500)
         minx, miny, maxx, maxy = shape.bounds
         root = shape.centroid
 

@@ -1,6 +1,8 @@
 fills:
-  - pattern: zigzag
+  - pattern: concentric
     spacing: 1.0
+
   - modification: image_mask
     mask_image: images/loz.jpg
     threshold: 0.5
+    simplify: 0.2

@@ -14,13 +14,9 @@ from cncpen import register_fill
 class SacredFill:
     """Generates a Flower of Life (overlapping circles) sacred geometry fill."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        pass
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        radius = max(context.args.spacing, 0.1)
+        radius = max(context.config.get('spacing', 2.0), 0.1)
         minx, miny, maxx, maxy = shape.bounds
         dx = radius
         dy = radius * math.sqrt(3) / 2.0

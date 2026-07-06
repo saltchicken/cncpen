@@ -15,42 +15,13 @@ from cncpen import register_fill
 class PhotoContourFill:
     """Generates topographic contours driven by image darkness."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--image",
-                            default=None,
-                            help="Input image for contouring"
-                           ).completer = argcomplete.completers.FilesCompleter(
-                               allowednames=(".png", ".jpg", ".jpeg"))
-
-        parser.add_argument(
-            "--levels",
-            type=int,
-            default=1,
-            help=
-            "Number of contour levels to extract from the image (default: 15)")
-        parser.add_argument(
-            "--resolution",
-            type=float,
-            default=0.5,
-            help=
-            "Sampling resolution in physical units. Lower is more detailed but slower. (default: 0.5)"
-        )
-        parser.add_argument(
-            "--min-length",
-            type=float,
-            default=2.0,
-            help=
-            "Minimum path length to draw, filtering out pixel noise dots (default: 2.0)"
-        )
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        sampler = getattr(context.args, 'sampler', None)
-        levels = getattr(context.args, 'levels', 15)
-        resolution = getattr(context.args, 'resolution', 0.5)
-        min_length = getattr(context.args, 'min_length', 2.0)
-        image_path = getattr(context.args, 'image', None)
+        sampler = context.config.get('sampler', None)
+        levels = context.config.get('levels', 15)
+        resolution = context.config.get('resolution', 0.5)
+        min_length = context.config.get('min_length', 2.0)
+        image_path = context.config.get('image', None)
 
         if not sampler and image_path:
             sampler = ImageSampler(image_path, context.bounds)

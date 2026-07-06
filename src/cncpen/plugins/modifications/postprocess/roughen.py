@@ -13,24 +13,13 @@ from cncpen import RenderContext
 @register_modification("roughen")
 class RoughenMod:
 
-    @classmethod
-    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--roughen-amp",
-                           type=float,
-                           default=0.0,
-                           help="Amplitude of hand-drawn noise")
-        group.add_argument("--roughen-step",
-                           type=float,
-                           default=1.0,
-                           help="Resolution of hand-drawn noise")
-
-    def is_active(self, args: argparse.Namespace) -> bool:
-        return getattr(args, 'roughen_amp', 0.0) > 0.0
+    def is_active(self, config: dict) -> bool:
+        return config.get('roughen_amp', 0.0) > 0.0
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
-        step = context.args.roughen_step
-        amp = context.args.roughen_amp
+        step = context.config.get('roughen_step', 1.0)
+        amp = context.config.get('roughen_amp', 0.0)
         return [
             self._roughen_line(line, step, amp)
             for line in lines

@@ -13,25 +13,12 @@ from cncpen import register_fill
 class SineFill:
     """Generates back-and-forth sine wave fill paths, optionally modulated by an image."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--amplitude",
-            type=float,
-            default=1.0,
-            help="Base amplitude for the sine wave pattern (default: 1.0)")
-        parser.add_argument(
-            "--wavelength",
-            type=float,
-            default=5.0,
-            help="Wavelength for the sine wave pattern (default: 5.0)")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = getattr(context.args, 'spacing', 2.0)
-        amplitude = getattr(context.args, 'amplitude', 1.0)
-        wavelength = getattr(context.args, 'wavelength', 5.0)
-        sampler = getattr(context.args, 'sampler', None)
+        spacing = context.config.get('spacing', 2.0)
+        amplitude = context.config.get('amplitude', 1.0)
+        wavelength = context.config.get('wavelength', 5.0)
+        sampler = context.config.get('sampler', None)
 
         minx, miny, maxx, maxy = shape.bounds
         y = miny + spacing

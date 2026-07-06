@@ -18,19 +18,9 @@ class PenroseFill:
     using recursive Robinson triangle deflation.
     """
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--depth",
-            type=int,
-            default=5,
-            help=
-            "Recursion depth for triangle deflation. Higher = smaller tiles (default: 5)",
-        )
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        depth = getattr(context.args, 'depth', 5)
+        depth = context.config.get('depth', 5)
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y
 

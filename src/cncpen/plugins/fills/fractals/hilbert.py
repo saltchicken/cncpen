@@ -13,13 +13,9 @@ from cncpen import register_fill
 class HilbertFill:
     """Generates a highly intricate Hilbert space-filling curve."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        pass
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = getattr(context.args, 'spacing', 2.0)
+        spacing = context.config.get('spacing', 2.0)
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny

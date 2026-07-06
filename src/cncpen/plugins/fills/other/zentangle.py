@@ -18,21 +18,11 @@ class ZentangleFill:
     Otherwise, defaults to wavy mathematical bands.
     """
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--density",
-            type=float,
-            default=3.0,
-            help=
-            "Base resolution of internal textures. Lower = tighter drawing (default: 3.0)",
-        )
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = getattr(context.args, 'spacing', 2.0)
-        density = getattr(context.args, 'density', 3.0)
-        sampler = getattr(context.args, 'sampler', None)
+        spacing = context.config.get('spacing', 2.0)
+        density = context.config.get('density', 3.0)
+        sampler = context.config.get('sampler', None)
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
 

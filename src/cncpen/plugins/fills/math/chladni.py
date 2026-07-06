@@ -17,36 +17,14 @@ class ChladniFill:
     If an image sampler is provided, it warps the resonant nodes based on the photo's darkness.
     """
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--n",
-                            type=float,
-                            default=3.0,
-                            help="Primary resonant frequency (default: 3.0)")
-        parser.add_argument("--m",
-                            type=float,
-                            default=5.0,
-                            help="Secondary resonant frequency (default: 5.0)")
-        parser.add_argument(
-            "--sign",
-            type=float,
-            default=-1.0,
-            help=
-            "Interference mode modifier, usually 1.0 or -1.0 (default: -1.0)")
-        parser.add_argument(
-            "--res",
-            type=float,
-            default=0.5,
-            help="Grid sampling resolution for tracing lines (default: 0.5)")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        n = getattr(context.args, 'n', 3.0)
-        m = getattr(context.args, 'm', 5.0)
-        sign = getattr(context.args, 'sign', -1.0)
-        res = getattr(context.args, 'res', 0.5)
-        simplify = context.args.simplify
-        sampler = getattr(context.args, 'sampler', None)
+        n = context.config.get('n', 3.0)
+        m = context.config.get('m', 5.0)
+        sign = context.config.get('sign', -1.0)
+        res = context.config.get('res', 0.5)
+        simplify = context.config.get('simplify', 0.0)
+        sampler = context.config.get('sampler', None)
 
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

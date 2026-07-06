@@ -12,19 +12,12 @@ from cncpen import RenderContext
 @register_modification("fisheye")
 class FisheyeMod:
 
-    @classmethod
-    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--fisheye",
-                           type=float,
-                           default=0.0,
-                           help="Apply radial distortion")
-
-    def is_active(self, args: argparse.Namespace) -> bool:
-        return getattr(args, 'fisheye', 0.0) != 0.0
+    def is_active(self, config: dict) -> bool:
+        return config.get('fisheye', 0.0) != 0.0
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
-        fisheye = context.args.fisheye
+        fisheye = context.config.get('fisheye', 0.0)
         if not fisheye or context.max_r <= 0:
             return lines
 

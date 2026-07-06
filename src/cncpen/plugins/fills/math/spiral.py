@@ -13,20 +13,10 @@ from cncpen import register_fill
 class SpiralFill:
     """Generates an Archimedean spiral outward from the shape's centroid."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        """Register plugin-specific command line arguments."""
-        parser.add_argument(
-            "--resolution",
-            type=float,
-            default=0.5,
-            help="Target distance between points along the curve (default: 0.5)"
-        )
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = getattr(context.args, 'spacing', 2.0)
-        resolution = getattr(context.args, 'resolution', 0.5)
+        spacing = context.config.get('spacing', 2.0)
+        resolution = context.config.get('resolution', 0.5)
 
         # Fallback to prevent infinite loops if invalid arguments are passed
         if spacing <= 0.01:

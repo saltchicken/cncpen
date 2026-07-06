@@ -11,23 +11,10 @@ from cncpen import ImageSampler
 @register_fill("photo_hatch")
 class PhotoHatchFill:
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--image",
-                            default=None,
-                            help="Input image for contouring"
-                           ).completer = argcomplete.completers.FilesCompleter(
-                               allowednames=(".png", ".jpg", ".jpeg"))
-
-        parser.add_argument("--cell-size",
-                            type=float,
-                            default=2.0,
-                            help="Size of the hatching grid cells")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        cell_size = getattr(context.args, 'cell_size', 2.0)
-        image_path = getattr(context.args, 'image', None)
+        cell_size = context.config.get('cell_size', 2.0)
+        image_path = context.config.get('image', None)
         
         # 2. Check for the image path directly
         if not image_path:

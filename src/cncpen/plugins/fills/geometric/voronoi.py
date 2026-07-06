@@ -15,18 +15,10 @@ from cncpen import register_fill
 class VoronoiFill:
     """Generates a Voronoi diagram fill based on random or image-weighted sites."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--sites",
-            type=int,
-            default=500,
-            help="Number of seed points for the Voronoi diagram (default: 500)")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        sites = getattr(context.args, 'sites', 500)
-        sampler = getattr(context.args, 'sampler', None)
+        sites = context.config.get('sites', 500)
+        sampler = context.config.get('sampler', None)
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny

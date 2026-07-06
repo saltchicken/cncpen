@@ -16,30 +16,13 @@ from cncpen import register_fill
 class PhotoConcentricFill:
     """Generates geometric concentric fills driven by image boundaries."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--image",
-                            default=None,
-                            help="Input image for contouring"
-                           ).completer = argcomplete.completers.FilesCompleter(
-                               allowednames=(".png", ".jpg", ".jpeg"))
-
-        parser.add_argument(
-            "--resolution",
-            type=float,
-            default=0.25,
-            help=
-            "Sampling resolution in mm. Lower is more precise but slower. (default: 0.25)"
-        )
-        # Note: --spacing and --threshold are already provided by your global CLI
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        sampler = getattr(context.args, 'sampler', None)
-        spacing = getattr(context.args, 'spacing', 2.0)
-        threshold = getattr(context.args, 'threshold', 0.5)
-        resolution = getattr(context.args, 'resolution', 0.25)
-        image_path = getattr(context.args, 'image', None)
+        sampler = context.config.get('sampler', None)
+        spacing = context.config.get('spacing', 2.0)
+        threshold = context.config.get('threshold', 0.5)
+        resolution = context.config.get('resolution', 0.25)
+        image_path = context.config.get('image', None)
 
         if not sampler and image_path:
             sampler = ImageSampler(image_path, context.bounds)

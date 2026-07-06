@@ -12,16 +12,9 @@ from cncpen import register_fill
 class GridFill:
     """Generates a standard orthogonal square grid tessellation."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--cell-size",
-                            type=float,
-                            default=2.0,
-                            help="Size of the grid squares (default: 2.0)")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        cell_size = getattr(context.args, 'cell_size', 2.0)
+        cell_size = context.config.get('cell_size', 2.0)
         minx, miny, maxx, maxy = shape.bounds
 
         if cell_size <= 0:

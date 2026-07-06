@@ -13,29 +13,12 @@ from cncpen import register_fill
 @register_fill("photo_wave")
 class PhotoWaveFill:
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--image",
-                            default=None,
-                            help="Input image for contouring"
-                           ).completer = argcomplete.completers.FilesCompleter(
-                               allowednames=(".png", ".jpg", ".jpeg"))
-
-        parser.add_argument("--lines",
-                            type=int,
-                            default=80,
-                            help="Number of horizontal wave lines")
-        parser.add_argument("--amp",
-                            type=float,
-                            default=2.0,
-                            help="Maximum wave amplitude multiplier")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        lines = getattr(context.args, 'lines', 80)
-        amp = getattr(context.args, 'amp', 2.0)
-        sampler = getattr(context.args, 'sampler', None)
-        image_path = getattr(context.args, 'image', None)
+        lines = context.config.get('lines', 80)
+        amp = context.config.get('amp', 2.0)
+        sampler = context.config.get('sampler', None)
+        image_path = context.config.get('image', None)
 
         if not sampler and image_path:
             sampler = ImageSampler(image_path, context.bounds)

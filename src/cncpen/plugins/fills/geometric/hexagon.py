@@ -13,17 +13,9 @@ from cncpen import register_fill
 class HexagonFill:
     """Generates a regular hexagonal (honeycomb) tessellation using a heuristic-driven graph traversal to minimize pen lifts."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--radius",
-            type=float,
-            default=3.0,
-            help="Radius (center to vertex) of the hexagons (default: 3.0)")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        radius = getattr(context.args, 'radius', 3.0)
+        radius = context.config.get('radius', 3.0)
         minx, miny, maxx, maxy = shape.bounds
 
         if radius <= 0:

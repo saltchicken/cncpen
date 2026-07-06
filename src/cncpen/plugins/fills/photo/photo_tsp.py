@@ -14,24 +14,11 @@ from cncpen import register_fill
 @register_fill("photo_tsp")
 class PhotoTSPFill:
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--image",
-                            default=None,
-                            help="Input image for contouring"
-                           ).completer = argcomplete.completers.FilesCompleter(
-                               allowednames=(".png", ".jpg", ".jpeg"))
-
-        parser.add_argument("--nodes",
-                            type=int,
-                            default=2000,
-                            help="Number of nodes to connect")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        nodes = getattr(context.args, 'nodes', 2000)
-        sampler = getattr(context.args, 'sampler', None)
-        image_path = getattr(context.args, 'image', None)
+        nodes = context.config.get('nodes', 2000)
+        sampler = context.config.get('sampler', None)
+        image_path = context.config.get('image', None)
 
         if not sampler and image_path:
             sampler = ImageSampler(image_path, context.bounds)

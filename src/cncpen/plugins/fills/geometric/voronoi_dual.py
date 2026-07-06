@@ -15,34 +15,12 @@ from cncpen import register_fill
 class VoronoiDualFill:
     """Generates Voronoi cells, Delaunay triangulations, or both overlaid."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--num-points",
-            type=int,
-            default=0,
-            help=
-            "Number of random points to generate. If 0, it auto-calculates based on the global --spacing. (default: 0)"
-        )
-        parser.add_argument(
-            "--seed",
-            type=int,
-            default=42,
-            help="Random seed for repeatable point generation (default: 42)")
-        parser.add_argument(
-            "--mode",
-            choices=["voronoi", "delaunay", "dual"],
-            default="dual",
-            help=
-            "Which edges to draw: 'voronoi', 'delaunay', or 'dual' for both. (default: dual)"
-        )
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = getattr(context.args, 'spacing', 2.0)
-        num_points = getattr(context.args, 'num_points', 0)
-        seed = getattr(context.args, 'seed', 42)
-        mode = getattr(context.args, 'mode', 'dual')
+        spacing = context.config.get('spacing', 2.0)
+        num_points = context.config.get('num_points', 0)
+        seed = context.config.get('seed', 42)
+        mode = context.config.get('mode', 'dual')
         lines = []
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

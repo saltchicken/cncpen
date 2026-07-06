@@ -13,17 +13,9 @@ from cncpen import register_fill
 class TriangleFill:
     """Generates an equilateral triangular (isometric grid) tessellation."""
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--cell-size",
-            type=float,
-            default=5.0,
-            help="Side length of the equilateral triangles (default: 5.0)")
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        cell_size = getattr(context.args, 'cell_size', 5.0)
+        cell_size = context.config.get('cell_size', 5.0)
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y
 

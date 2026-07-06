@@ -17,35 +17,12 @@ class ChaoticFill:
     is recursively morphed using spatially-driven affine transformations.
     """
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--depth",
-            type=int,
-            default=4,
-            help=
-            "Recursion depth for fractal fills. Higher = more detail (default: 4)"
-        )
-        parser.add_argument(
-            "--chaos-freq",
-            type=float,
-            default=0.15,
-            help="Frequency of the spatial warp for chaotic fill (default: 0.15)"
-        )
-        parser.add_argument(
-            "--chaos-amp",
-            type=float,
-            default=0.8,
-            help=
-            "Amplitude/intensity of the spatial warp for chaotic fill (default: 0.8)"
-        )
-
     def generate(self, shape: BaseGeometry,
                  context: 'RenderContext') -> List[LineString]:
-        spacing = getattr(context.args, 'spacing', 2.0)
-        depth = getattr(context.args, 'depth', 4)
-        chaos_freq = getattr(context.args, 'chaos_freq', 0.15)
-        chaos_amp = getattr(context.args, 'chaos_amp', 0.8)
+        spacing = context.config.get('spacing', 2.0)
+        depth = context.config.get('depth', 4)
+        chaos_freq = context.config.get('chaos_freq', 0.15)
+        chaos_amp = context.config.get('chaos_amp', 0.8)
 
         minx, miny, maxx, maxy = shape.bounds
         coarse_spacing = max(spacing * 4.0, 1.0)
