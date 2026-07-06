@@ -1,0 +1,15 @@
+globals:
+  outline_simplify: 0.1
+
+fills:
+  - pattern: flow_field
+    spacing: 5.0         # How close together the starting lines are
+    step_length: 0.5     # Resolution of the curve (lower = smoother)
+    max_steps: 150       # How long each line is allowed to grow
+    scale: 0.08          # How tightly the field twists (lower = wider sweeps)
+    seed: 99             # Change this to get a completely different random swirl
+
+  - modification: simplify
+    threshold: 0.2
+
+  - modification: optimize

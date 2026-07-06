@@ -1,5 +1,4 @@
 globals:
-  feed: 1500.0
   outline_simplify: 0.1
 
 fills:
