@@ -74,9 +74,6 @@ class FillPattern(Protocol):
 
 class PathModification(Protocol):
 
-    def is_active(self, config: dict) -> bool:
-        ...
-
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
         ...

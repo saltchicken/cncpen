@@ -9,10 +9,6 @@ from cncpen import RenderContext
 @register_modification("simplify")
 class SimplifyMod:
 
-    def is_active(self, config: dict) -> bool:
-        # The modification is active whenever called in the YAML sequence
-        return True
-
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
 

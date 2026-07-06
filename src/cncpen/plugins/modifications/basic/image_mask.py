@@ -11,9 +11,6 @@ from cncpen import RenderContext
 @register_modification("image_mask")
 class ImageMaskMod:
 
-    def is_active(self, config: dict) -> bool:
-        return bool(config.get('mask_image'))
-
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
 

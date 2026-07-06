@@ -12,9 +12,6 @@ from cncpen import RenderContext
 @register_modification("fisheye")
 class FisheyeMod:
 
-    def is_active(self, config: dict) -> bool:
-        return config.get('fisheye', 0.0) != 0.0
-
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
         fisheye = context.config.get('fisheye', 0.0)

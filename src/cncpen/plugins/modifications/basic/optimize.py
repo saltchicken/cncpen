@@ -6,8 +6,6 @@ from cncpen.geometry import optimize_paths_nearest_neighbor
 
 @register_modification("optimize")
 class OptimizeMod:
-    def is_active(self, config: dict) -> bool:
-        return True
 
     def apply(self, lines: List[LineString], context: RenderContext) -> List[LineString]:
         if not lines:

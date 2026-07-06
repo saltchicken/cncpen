@@ -13,9 +13,6 @@ from cncpen import RenderContext
 @register_modification("roughen")
 class RoughenMod:
 
-    def is_active(self, config: dict) -> bool:
-        return config.get('roughen_amp', 0.0) > 0.0
-
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
         step = context.config.get('roughen_step', 1.0)
