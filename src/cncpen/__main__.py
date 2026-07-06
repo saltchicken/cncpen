@@ -20,7 +20,7 @@ def main() -> None:
     logging.getLogger('ezdxf').setLevel(logging.WARNING)
 
     total_start = time.perf_counter()
-    
+
     # config is now a JobConfig dataclass
     config = parse_args()
 
@@ -28,7 +28,8 @@ def main() -> None:
     step_start = time.perf_counter()
 
     try:
-        paths_to_draw = extract_dxf_paths(config.dxf_file, simplify_tolerance=config.outline_simplify)
+        paths_to_draw = extract_dxf_paths(
+            config.dxf_file, simplify_tolerance=config.outline_simplify)
     except DXFReadError as e:
         logger.error(f"Fatal Error: {e}")
         sys.exit(1)
@@ -48,15 +49,18 @@ def main() -> None:
         logger.info("Processing outlines...")
         step_start = time.perf_counter()
         closed_polys = process_outlines(paths_to_draw, config, pen)
-        logger.info(f"Outlines processed in {time.perf_counter() - step_start:.3f}s.")
+        logger.info(
+            f"Outlines processed in {time.perf_counter() - step_start:.3f}s.")
 
         logger.info(f"Processing {len(config.fills)} fill steps...")
         step_start = time.perf_counter()
         # Simplified process_fills signature
         process_fills(closed_polys, config, pen)
-        logger.info(f"Fills processed in {time.perf_counter() - step_start:.3f}s.")
+        logger.info(
+            f"Fills processed in {time.perf_counter() - step_start:.3f}s.")
 
-    logger.info(f"Total execution time: {time.perf_counter() - total_start:.3f}s.")
+    logger.info(
+        f"Total execution time: {time.perf_counter() - total_start:.3f}s.")
 
 
 if __name__ == "__main__":

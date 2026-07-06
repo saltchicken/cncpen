@@ -6,7 +6,9 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill, RenderContext, ImageSampler
+from cncpen import ImageSampler
+from cncpen import register_fill
+from cncpen import RenderContext
 
 
 @register_fill("photo_wave")

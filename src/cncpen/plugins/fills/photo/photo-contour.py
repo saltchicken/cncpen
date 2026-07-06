@@ -7,7 +7,9 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from skimage import measure
 
-from cncpen import register_fill, RenderContext, ImageSampler
+from cncpen import ImageSampler
+from cncpen import register_fill
+from cncpen import RenderContext
 
 
 @register_fill("photo-contour")

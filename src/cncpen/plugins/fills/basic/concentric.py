@@ -3,7 +3,8 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill, RenderContext
+from cncpen import register_fill
+from cncpen import RenderContext
 
 
 @register_fill("concentric")

@@ -9,7 +9,8 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill, RenderContext
+from cncpen import register_fill
+from cncpen import RenderContext
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,8 @@ class VenationFill:
         density = context.config.params.get('density', 400)
 
         # SAFETY 1: Prevent 0-length steps that go nowhere
-        segment_length = max(0.1, context.config.params.get('segment_length', 2.0))
+        segment_length = max(0.1,
+                             context.config.params.get('segment_length', 2.0))
         attraction_dist = context.config.params.get('attraction_distance', 20.0)
 
         # SAFETY 2: Prevent branches from stepping over attractors and oscillating endlessly

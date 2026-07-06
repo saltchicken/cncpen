@@ -3,7 +3,9 @@ from typing import List
 
 from shapely.geometry import LineString
 
-from cncpen import register_modification, RenderContext, ImageSampler
+from cncpen import ImageSampler
+from cncpen import register_modification
+from cncpen import RenderContext
 
 
 @register_modification("image_mask")

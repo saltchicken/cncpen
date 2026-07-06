@@ -7,7 +7,8 @@ import yaml
 
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
-from cncpen.config import JobConfig, StepConfig
+from cncpen.config import JobConfig
+from cncpen.config import StepConfig
 from cncpen.plugins import load_plugins
 
 
@@ -20,16 +21,22 @@ def parse_args() -> JobConfig:
     parser.add_argument("dxf_file", help="Path to the input DXF file")
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-c", "--config", help="Path to a custom YAML job configuration file")
-    group.add_argument("-p", "--preset", help="Name of a built-in preset (e.g., 'contour')")
+    group.add_argument("-c",
+                       "--config",
+                       help="Path to a custom YAML job configuration file")
+    group.add_argument("-p",
+                       "--preset",
+                       help="Name of a built-in preset (e.g., 'contour')")
 
     args = parser.parse_args()
     job_config_raw = {}
 
     if args.preset:
-        preset_filename = args.preset if args.preset.endswith('.yaml') else f"{args.preset}.yaml"
+        preset_filename = args.preset if args.preset.endswith(
+            '.yaml') else f"{args.preset}.yaml"
         try:
-            config_text = pkg_resources.files('cncpen.presets').joinpath(preset_filename).read_text()
+            config_text = pkg_resources.files('cncpen.presets').joinpath(
+                preset_filename).read_text()
             job_config_raw = yaml.safe_load(config_text) or {}
         except FileNotFoundError:
             available = [
@@ -37,7 +44,9 @@ def parse_args() -> JobConfig:
                 for f in pkg_resources.files('cncpen.presets').iterdir()
                 if f.name.endswith('.yaml')
             ]
-            parser.error(f"Preset '{args.preset}' not found. Available presets: {', '.join(available)}")
+            parser.error(
+                f"Preset '{args.preset}' not found. Available presets: {', '.join(available)}"
+            )
         except Exception as e:
             parser.error(f"Failed to read preset YAML: {e}")
     else:
@@ -77,12 +86,10 @@ def parse_args() -> JobConfig:
 
         fills.append(StepConfig(**step_args, params=params))
 
-    return JobConfig(
-        dxf_file=dxf_file,
-        output=output,
-        outline_simplify=raw_globals.get('outline_simplify', 0.0),
-        no_outline=raw_globals.get('no_outline', False),
-        feed=raw_globals.get('feed', 1200.0),
-        fills=fills,
-        globals=raw_globals
-    )
+    return JobConfig(dxf_file=dxf_file,
+                     output=output,
+                     outline_simplify=raw_globals.get('outline_simplify', 0.0),
+                     no_outline=raw_globals.get('no_outline', False),
+                     feed=raw_globals.get('feed', 1200.0),
+                     fills=fills,
+                     globals=raw_globals)

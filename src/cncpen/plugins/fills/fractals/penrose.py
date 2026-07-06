@@ -6,7 +6,8 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill, RenderContext
+from cncpen import register_fill
+from cncpen import RenderContext
 
 PHI = (1.0 + math.sqrt(5.0)) / 2.0
 

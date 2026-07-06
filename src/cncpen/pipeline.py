@@ -18,7 +18,8 @@ from shapely.ops import unary_union
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
 from cncpen import RenderContext
-from cncpen.config import JobConfig, StepConfig
+from cncpen.config import JobConfig
+from cncpen.config import StepConfig
 from cncpen.geometry import _ensure_geom
 from cncpen.geometry import apply_clipping
 from cncpen.geometry import apply_transform
@@ -41,7 +42,8 @@ def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
             dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
             if math.hypot(dx, dy) < 0.01:
                 poly = Polygon(pts)
-                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
+                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(
+                    0)
                 if poly.area > 0:
                     closed_polys.append(poly)
 
@@ -69,7 +71,9 @@ def _prepare_source_geometry(
         return poly, active_lines
 
     if not active_lines:
-        logger.warning("    -> 'use_previous_lines' specified, but no lines exist yet. Skipping.")
+        logger.warning(
+            "    -> 'use_previous_lines' specified, but no lines exist yet. Skipping."
+        )
         return poly, active_lines
 
     if step_config.polygonize:
@@ -84,9 +88,13 @@ def _prepare_source_geometry(
 
         if extracted_polys:
             source_geom = GeometryCollection(extracted_polys)
-            logger.info(f"    -> Polygonized previous lines into {len(extracted_polys)} closed regions.")
+            logger.info(
+                f"    -> Polygonized previous lines into {len(extracted_polys)} closed regions."
+            )
         else:
-            logger.warning("    -> Could not find closed regions to polygonize, falling back to lines.")
+            logger.warning(
+                "    -> Could not find closed regions to polygonize, falling back to lines."
+            )
             source_geom = MultiLineString(active_lines)
     else:
         source_geom = MultiLineString(active_lines)
@@ -95,8 +103,9 @@ def _prepare_source_geometry(
     return source_geom, remaining_lines
 
 
-def _apply_pattern(step_config: StepConfig, active_lines: List[LineString], poly: Polygon,
-                   centroid: Point, max_r: float) -> List[LineString]:
+def _apply_pattern(step_config: StepConfig, active_lines: List[LineString],
+                   poly: Polygon, centroid: Point,
+                   max_r: float) -> List[LineString]:
     """Handles geometry extraction, rendering context setup, and pattern generation."""
     fill_class = FILL_REGISTRY.get(step_config.pattern)
 
@@ -105,31 +114,34 @@ def _apply_pattern(step_config: StepConfig, active_lines: List[LineString], poly
         return active_lines
 
     filler = fill_class()
-    
-    source_geom, new_active_lines = _prepare_source_geometry(step_config, active_lines, poly)
+
+    source_geom, new_active_lines = _prepare_source_geometry(
+        step_config, active_lines, poly)
 
     # Setup Rotations and Context Boundaries
     working_geom = affinity.rotate(
-        source_geom, -step_config.angle, origin=centroid) if step_config.angle != 0.0 else source_geom
-    
-    context_boundary_geom = poly.buffer(step_config.overscan) if step_config.overscan > 0 else poly
+        source_geom, -step_config.angle,
+        origin=centroid) if step_config.angle != 0.0 else source_geom
+
+    context_boundary_geom = poly.buffer(
+        step_config.overscan) if step_config.overscan > 0 else poly
     context_working_boundary = affinity.rotate(
         context_boundary_geom, -step_config.angle,
         origin=centroid) if step_config.angle != 0.0 else context_boundary_geom
 
-    context = RenderContext(
-        config=step_config,
-        boundary=context_working_boundary,
-        centroid=centroid,
-        max_r=max_r + step_config.overscan
-    )
+    context = RenderContext(config=step_config,
+                            boundary=context_working_boundary,
+                            centroid=centroid,
+                            max_r=max_r + step_config.overscan)
 
     lines = []
-    geoms = [working_geom] if working_geom.geom_type in ('Polygon', 'LineString', 'LinearRing') else list(working_geom.geoms)
+    geoms = [working_geom] if working_geom.geom_type in (
+        'Polygon', 'LineString', 'LinearRing') else list(working_geom.geoms)
 
     # Generate geometries
     for g in geoms:
-        gen_shape = g.buffer(step_config.overscan) if (step_config.overscan > 0 and g.geom_type == 'Polygon') else g
+        gen_shape = g.buffer(step_config.overscan) if (
+            step_config.overscan > 0 and g.geom_type == 'Polygon') else g
         step_lines = filler.generate(gen_shape, context)
 
         if step_config.clip_local and g.geom_type == 'Polygon':
@@ -150,13 +162,15 @@ def _apply_pattern(step_config: StepConfig, active_lines: List[LineString], poly
     return new_active_lines
 
 
-def _apply_modification(step_config: StepConfig, active_lines: List[LineString], poly: Polygon,
-                        centroid: Point, max_r: float) -> List[LineString]:
+def _apply_modification(step_config: StepConfig, active_lines: List[LineString],
+                        poly: Polygon, centroid: Point,
+                        max_r: float) -> List[LineString]:
     """Applies a post-processing modification to the current active lines."""
     mod_class = MODIFICATION_REGISTRY.get(step_config.modification)
 
     if not mod_class:
-        logger.warning(f"    -> Unknown modification '{step_config.modification}'")
+        logger.warning(
+            f"    -> Unknown modification '{step_config.modification}'")
         return active_lines
 
     mod = mod_class()
@@ -169,7 +183,8 @@ def _apply_modification(step_config: StepConfig, active_lines: List[LineString],
     return apply_clipping(active_lines, boundary=poly)
 
 
-def process_fills(closed_polys: List[Polygon], config: JobConfig, pen: PenTool) -> None:
+def process_fills(closed_polys: List[Polygon], config: JobConfig,
+                  pen: PenTool) -> None:
     """Executes the pipeline of fill patterns and modifications."""
     if not closed_polys or not config.fills:
         return
@@ -180,7 +195,8 @@ def process_fills(closed_polys: List[Polygon], config: JobConfig, pen: PenTool) 
 
     centroid = poly.centroid
     global_minx, global_miny, global_maxx, global_maxy = poly.bounds
-    max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
+    max_r = math.hypot(global_maxx - global_minx,
+                       global_maxy - global_miny) / 2.0
 
     active_lines = []
     total_steps = len(config.fills)
@@ -189,15 +205,23 @@ def process_fills(closed_polys: List[Polygon], config: JobConfig, pen: PenTool) 
         step_timer = time.perf_counter()
 
         if step_config.pattern:
-            logger.info(f"  [{step_idx}/{total_steps}] Executing fill pattern '{step_config.pattern}'...")
-            active_lines = _apply_pattern(step_config, active_lines, poly, centroid, max_r)
+            logger.info(
+                f"  [{step_idx}/{total_steps}] Executing fill pattern '{step_config.pattern}'..."
+            )
+            active_lines = _apply_pattern(step_config, active_lines, poly,
+                                          centroid, max_r)
 
         elif step_config.modification:
-            logger.info(f"  [{step_idx}/{total_steps}] Applying modification '{step_config.modification}'...")
-            active_lines = _apply_modification(step_config, active_lines, poly, centroid, max_r)
+            logger.info(
+                f"  [{step_idx}/{total_steps}] Applying modification '{step_config.modification}'..."
+            )
+            active_lines = _apply_modification(step_config, active_lines, poly,
+                                               centroid, max_r)
 
         else:
-            logger.warning(f"  [{step_idx}/{total_steps}] Step must contain 'pattern' or 'modification'. Ignored.")
+            logger.warning(
+                f"  [{step_idx}/{total_steps}] Step must contain 'pattern' or 'modification'. Ignored."
+            )
             continue
 
         total_vertices = sum(len(line.coords) for line in active_lines)

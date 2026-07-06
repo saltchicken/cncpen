@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from typing import Any, Dict, List, Optional
 
 
@@ -7,7 +8,7 @@ class StepConfig:
     """Configuration for an individual fill or modification step."""
     pattern: Optional[str] = None
     modification: Optional[str] = None
-    
+
     # Core pipeline properties
     use_previous_lines: bool = False
     polygonize: bool = True
@@ -16,7 +17,7 @@ class StepConfig:
     overscan: float = 0.0
     simplify: float = 0.0
     angle: float = 0.0
-    
+
     # Store arbitrary plugin-specific parameters here
     params: Dict[str, Any] = field(default_factory=dict)
 

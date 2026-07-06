@@ -6,7 +6,8 @@ from typing import Any, List
 import argcomplete
 from shapely.geometry import LineString
 
-from cncpen import register_modification, RenderContext
+from cncpen import register_modification
+from cncpen import RenderContext
 
 
 @register_modification("roughen")

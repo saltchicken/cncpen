@@ -8,7 +8,8 @@ from shapely.geometry import MultiPoint
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import voronoi_diagram
 
-from cncpen import register_fill, RenderContext
+from cncpen import register_fill
+from cncpen import RenderContext
 
 
 @register_fill("voronoi")
