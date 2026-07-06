@@ -144,11 +144,24 @@ def process_fills(closed_polys: List[Polygon],
             
             # Handle standard Polygons as well as LineStrings/MultiLineStrings
             geoms = [working_geom] if working_geom.geom_type in ('Polygon', 'LineString', 'LinearRing') else list(working_geom.geoms)
+            
+            # Check the YAML for the local clipping preference (defaults to True)
+            clip_local = step_def.get('clip_local', True)
+
             for g in geoms:
-                lines.extend(filler.generate(g, context))
+                step_lines = filler.generate(g, context)
+                
+                # Clip strictly to the local sub-cell if requested and if it's a closed area
+                if clip_local and g.geom_type == 'Polygon':
+                    step_lines = apply_clipping(step_lines, boundary=g)
+                    
+                lines.extend(step_lines)
 
             lines = [line for line in lines if not line.is_empty]
+            
+            # ALWAYS clip against the master boundary to ensure we never ruin the main DXF shape
             lines = apply_clipping(lines, boundary=working_boundary)
+            
             lines = apply_transform(lines,
                                     angle=angle,
                                     origin=centroid,
