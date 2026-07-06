@@ -1,27 +1,13 @@
 import argparse
-import importlib
 import importlib.resources as pkg_resources
 import os
-import pkgutil
 import sys
 
 import yaml
 
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
-
-
-def load_plugins() -> None:
-    """Dynamically loads all plugins in the cncpen.plugins directory tree."""
-    try:
-        import cncpen.plugins
-    except ImportError:
-        return
-
-    for _, name, is_pkg in pkgutil.walk_packages(cncpen.plugins.__path__,
-                                                 cncpen.plugins.__name__ + "."):
-        if not is_pkg:
-            importlib.import_module(name)
+from cncpen.plugins import load_plugins
 
 
 def parse_args() -> dict:

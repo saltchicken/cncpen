@@ -1,10 +1,6 @@
 import logging
-import math
 import sys
 import time
-from typing import List, Tuple
-
-from shapely.geometry import Polygon
 
 from cncpen.cli import parse_args
 from cncpen.dxf import DXFReadError
@@ -12,29 +8,9 @@ from cncpen.dxf import extract_dxf_paths
 from cncpen.pen import PenConfig
 from cncpen.pen import PenTool
 from cncpen.pipeline import process_fills
+from cncpen.pipeline import process_outlines
 
 logger = logging.getLogger(__name__)
-
-
-def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
-                     config: dict, pen: PenTool) -> List[Polygon]:
-    """Draws outlines and extracts closed polygons to be used as fill boundaries."""
-    closed_polys: List[Polygon] = []
-    has_fills = bool(config.get('fills'))
-
-    for pts in paths_to_draw:
-        if not config.get('no_outline', False):
-            pen.draw_path(pts, clearance=True)
-
-        if has_fills and len(pts) > 2:
-            dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
-            if math.hypot(dx, dy) < 0.01:
-                poly = Polygon(pts)
-                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
-                if poly.area > 0:
-                    closed_polys.append(poly)
-
-    return closed_polys
 
 
 def main() -> None:

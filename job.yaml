@@ -1,13 +1,12 @@
 fills:
-  - pattern: grid
-    cell_size: 50.0
-    overscan: 50
   - pattern: zigzag
-    angle: 30
+    angle: 45
+    spacing: 25
+  - pattern: chladni
     use_previous_lines: true
     polygonize: true
-    clip_local: false
-    replace_previous: true
+    clip_local: true
+    replace_previous: false
     spacing: 2.5
   - modification: simplify
     threshold: 0.2

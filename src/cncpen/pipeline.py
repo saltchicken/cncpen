@@ -25,6 +25,27 @@ from cncpen.pen import PenTool
 
 logger = logging.getLogger(__name__)
 
+def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
+                     config: dict, pen: PenTool) -> List[Polygon]:
+    """Draws outlines and extracts closed polygons to be used as fill boundaries."""
+    closed_polys: List[Polygon] = []
+    has_fills = bool(config.get('fills'))
+
+    for pts in paths_to_draw:
+        if not config.get('no_outline', False):
+            pen.draw_path(pts, clearance=True)
+
+        if has_fills and len(pts) > 2:
+            dx, dy = pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]
+            if math.hypot(dx, dy) < 0.01:
+                poly = Polygon(pts)
+                poly = poly if poly.is_valid and poly.area > 0 else poly.buffer(0)
+                if poly.area > 0:
+                    closed_polys.append(poly)
+
+    return closed_polys
+
+
 
 def _get_boundary_polygon(closed_polys: List[Polygon]) -> Optional[Polygon]:
     """Combines individual closed polygons into a single master boundary."""
