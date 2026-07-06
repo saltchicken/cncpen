@@ -1,15 +1,47 @@
 import argparse
 import importlib.resources as pkg_resources
 import os
-import sys
 
 import yaml
+import argcomplete
 
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
 from cncpen.config import JobConfig
 from cncpen.config import StepConfig
 from cncpen.plugins import load_plugins
+
+
+def get_available_presets(base_path) -> dict:
+    """Recursively search for all YAML presets in the given package resource path."""
+    presets = {}
+    for item in base_path.iterdir():
+        if item.is_dir():
+            presets.update(get_available_presets(item))
+        elif item.name.endswith('.yaml'):
+            presets[item.name.replace('.yaml', '')] = item
+    return presets
+
+
+def preset_completer(prefix, parsed_args, **kwargs):
+    """Provide a dictionary of preset names and descriptions for argcomplete."""
+    base_path = pkg_resources.files('cncpen.presets')
+    presets = get_available_presets(base_path)
+    
+    completions = {}
+    for name, filepath in presets.items():
+        description = "No description provided"
+        try:
+            # Parse the YAML file to extract the description
+            config = yaml.safe_load(filepath.read_text())
+            if isinstance(config, dict) and 'description' in config:
+                description = config['description']
+        except Exception:
+            pass # Fallback to default if the file is malformed or unreadable
+            
+        completions[name] = description
+        
+    return completions
 
 
 def parse_args() -> JobConfig:
@@ -24,31 +56,32 @@ def parse_args() -> JobConfig:
     group.add_argument("-c",
                        "--config",
                        help="Path to a custom YAML job configuration file")
+    
+    # Attach the custom completer to the preset argument
     group.add_argument("-p",
                        "--preset",
-                       help="Name of a built-in preset (e.g., 'contour')")
+                       help="Name of a built-in preset (e.g., 'contour')").completer = preset_completer
 
+    # Initialize argcomplete before parsing arguments
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
     job_config_raw = {}
 
     if args.preset:
-        preset_filename = args.preset if args.preset.endswith(
-            '.yaml') else f"{args.preset}.yaml"
-        try:
-            config_text = pkg_resources.files('cncpen.presets').joinpath(
-                preset_filename).read_text()
-            job_config_raw = yaml.safe_load(config_text) or {}
-        except FileNotFoundError:
-            available = [
-                f.name.replace('.yaml', '')
-                for f in pkg_resources.files('cncpen.presets').iterdir()
-                if f.name.endswith('.yaml')
-            ]
+        preset_base = pkg_resources.files('cncpen.presets')
+        available_presets = get_available_presets(preset_base)
+        preset_name = args.preset.replace('.yaml', '')
+
+        if preset_name in available_presets:
+            try:
+                config_text = available_presets[preset_name].read_text()
+                job_config_raw = yaml.safe_load(config_text) or {}
+            except Exception as e:
+                parser.error(f"Failed to read preset YAML: {e}")
+        else:
             parser.error(
-                f"Preset '{args.preset}' not found. Available presets: {', '.join(available)}"
+                f"Preset '{preset_name}' not found. Available presets: {', '.join(available_presets.keys())}"
             )
-        except Exception as e:
-            parser.error(f"Failed to read preset YAML: {e}")
     else:
         try:
             with open(args.config, 'r') as f:
@@ -75,7 +108,6 @@ def parse_args() -> JobConfig:
         step_args = {}
         params = {}
 
-        # Merge globals and step defs, identical to how pipeline previously handled it
         merged_dict = {**raw_globals, **step}
 
         for k, v in merged_dict.items():
