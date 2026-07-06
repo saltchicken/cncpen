@@ -1,5 +1,7 @@
 import math
 from typing import Any, List, Tuple
+import numpy as np
+from scipy.spatial import cKDTree
 
 from shapely import affinity
 from shapely.geometry import LineString
@@ -11,46 +13,72 @@ def optimize_paths_nearest_neighbor(
     paths: List[List[Tuple[float, float]]],
     start_pt: Tuple[float, float] = (0.0, 0.0)
 ) -> List[List[Tuple[float, float]]]:
-    """Sorts paths using a greedy nearest-neighbor approach to minimize travel time."""
+    """
+    Sorts paths using a greedy nearest-neighbor approach to minimize travel time.
+    Utilizes a KD-Tree for O(N log N) spatial querying of endpoints.
+    """
     if not paths:
         return []
 
-    unvisited = list(paths)
+    # Filter out empty paths to ensure coordinate extraction doesn't crash
+    valid_paths = [p for p in paths if p]
+    n_paths = len(valid_paths)
+    if n_paths == 0:
+        return []
+
+    # Flatten start and end points into a single array for the KDTree
+    # Index format: even = start point, odd = end point
+    endpoints = np.zeros((n_paths * 2, 2))
+    for i, path in enumerate(valid_paths):
+        endpoints[i * 2] = path[0]        # Start point
+        endpoints[i * 2 + 1] = path[-1]   # End point
+
+    # Build the spatial index
+    tree = cKDTree(endpoints)
+    visited = np.zeros(n_paths, dtype=bool)
     optimized: List[List[Tuple[float, float]]] = []
-    current_pt = start_pt
+    current_pt = np.array(start_pt)
 
-    def dist(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
-        return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
-
-    while unvisited:
+    for _ in range(n_paths):
+        k = 16  # Initial search batch size
         best_idx = -1
-        best_dist = float('inf')
-        reverse_best = False
-
-        for i, path in enumerate(unvisited):
-            if not path:
-                continue
-            d_start = dist(current_pt, path[0])
-            if d_start < best_dist:
-                best_dist = d_start
-                best_idx = i
-                reverse_best = False
-
-            d_end = dist(current_pt, path[-1])
-            if d_end < best_dist:
-                best_dist = d_end
-                best_idx = i
-                reverse_best = True
+        
+        while best_idx == -1:
+            query_k = min(k, n_paths * 2)
+            distances, indices = tree.query(current_pt, k=query_k)
+            
+            # Scipy returns scalars if k=1, but arrays if k>1
+            if query_k == 1:
+                distances, indices = [distances], [indices]
+                
+            for dist, idx in zip(distances, indices):
+                path_idx = idx // 2
+                if not visited[path_idx]:
+                    best_idx = idx
+                    break
+            
+            if best_idx == -1:
+                # If all 'k' nearest neighbors were already visited, expand search ring
+                if query_k == n_paths * 2:
+                    break  # Should only hit this if logic fails or floats corrupt
+                k *= 4
 
         if best_idx == -1:
             break
 
-        chosen_path = unvisited.pop(best_idx)
-        if reverse_best:
+        # Decode the point index back to the path and direction
+        path_idx = best_idx // 2
+        is_end = (best_idx % 2 != 0)
+        
+        chosen_path = valid_paths[path_idx]
+        if is_end:
             chosen_path = list(reversed(chosen_path))
-
+            
         optimized.append(chosen_path)
-        current_pt = chosen_path[-1]
+        visited[path_idx] = True
+        
+        # Update current position to the exit point of the chosen path
+        current_pt = np.array(chosen_path[-1])
 
     return optimized
 
