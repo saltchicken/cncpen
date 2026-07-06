@@ -5,11 +5,21 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("flow_field")
+class FlowFieldConfig(BaseModel):
+    spacing: float = Field(default=3.0, gt=0.0)
+    step_length: float = Field(default=1.0, gt=0.0)
+    max_steps: int = Field(default=50, gt=0)
+    scale: float = Field(default=0.1)
+    seed: int = Field(default=42)
+
+
+@register_fill("flow_field", config_class=FlowFieldConfig)
 class FlowFieldFill:
     """
     Generates organic, sweeping curves by dropping 'seeds' and tracing 
@@ -18,12 +28,12 @@ class FlowFieldFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        # Configuration with safe defaults
-        spacing = context.config.get('spacing', 3.0)
-        step_length = context.config.get('step_length', 1.0)
-        max_steps = context.config.get('max_steps', 50)
-        scale = context.config.get('scale', 0.1)
-        seed = context.config.get('seed', 42)
+        params = context.config.params
+        spacing = params.spacing
+        step_length = params.step_length
+        max_steps = params.max_steps
+        scale = params.scale
+        seed = params.seed
 
         random.seed(seed)
         minx, miny, maxx, maxy = shape.bounds

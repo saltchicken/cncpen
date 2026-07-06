@@ -3,23 +3,31 @@ from typing import List
 
 from shapely.geometry import LineString
 
+from pydantic import BaseModel, Field
+
 from cncpen import ImageSampler
 from cncpen import register_modification
 from cncpen import RenderContext
 
 
-@register_modification("image_mask")
+class ImageMaskConfig(BaseModel):
+    mask_image: str | None = None
+    threshold: float = Field(default=0.5)
+
+
+@register_modification("image_mask", config_class=ImageMaskConfig)
 class ImageMaskMod:
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
+        params = context.config.params
 
-        mask_image = context.config.params.get('mask_image')
+        mask_image = params.mask_image
         if not mask_image:
             return lines
 
         mask_sampler = ImageSampler(mask_image, context.bounds)
-        threshold = context.config.params.get('threshold', 0.5)
+        threshold = params.threshold
         masked_lines = []
         step_res = 1.0
 

@@ -7,11 +7,22 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("chladni")
+class ChladniConfig(BaseModel):
+    n: float = Field(default=3.0)
+    m: float = Field(default=5.0)
+    sign: float = Field(default=-1.0)
+    res: float = Field(default=0.5, gt=0.0)
+    simplify: float = Field(default=0.0, ge=0.0)
+    sampler: Any = None
+
+
+@register_fill("chladni", config_class=ChladniConfig)
 class ChladniFill:
     """
     Generates Chladni resonant plate patterns using a marching squares algorithm.
@@ -20,12 +31,13 @@ class ChladniFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        n = context.config.params.get('n', 3.0)
-        m = context.config.params.get('m', 5.0)
-        sign = context.config.params.get('sign', -1.0)
-        res = context.config.params.get('res', 0.5)
-        simplify = context.config.params.get('simplify', 0.0)
-        sampler = context.config.params.get('sampler', None)
+        params = context.config.params
+        n = params.n
+        m = params.m
+        sign = params.sign
+        res = params.res
+        simplify = params.simplify
+        sampler = params.sampler
 
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

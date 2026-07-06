@@ -6,19 +6,28 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import ImageSampler
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("photo_stipple")
+class PhotoStippleConfig(BaseModel):
+    dots: int = Field(default=5000, gt=0)
+    image: str | None = None
+    sampler: Any = None
+
+
+@register_fill("photo_stipple", config_class=PhotoStippleConfig)
 class PhotoStippleFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        dots = context.config.params.get('dots', 5000)
-        sampler = context.config.params.get('sampler', None)
-        image_path = context.config.params.get('image', None)
+        params = context.config.params
+        dots = params.dots
+        sampler = params.sampler
+        image_path = params.image
 
         if not sampler and image_path:
             sampler = ImageSampler(image_path, context.bounds)

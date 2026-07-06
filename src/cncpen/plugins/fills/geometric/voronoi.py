@@ -8,18 +8,26 @@ from shapely.geometry import MultiPoint
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import voronoi_diagram
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("voronoi")
+class VoronoiConfig(BaseModel):
+    sites: int = Field(default=500, gt=1)
+    sampler: Any = None
+
+
+@register_fill("voronoi", config_class=VoronoiConfig)
 class VoronoiFill:
     """Generates a Voronoi diagram fill based on random or image-weighted sites."""
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        sites = context.config.params.get('sites', 500)
-        sampler = context.config.params.get('sampler', None)
+        params = context.config.params
+        sites = params.sites
+        sampler = params.sampler
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny

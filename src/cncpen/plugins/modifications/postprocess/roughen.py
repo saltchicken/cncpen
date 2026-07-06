@@ -6,17 +6,25 @@ from typing import Any, List
 import argcomplete
 from shapely.geometry import LineString
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_modification
 from cncpen import RenderContext
 
 
-@register_modification("roughen")
+class RoughenConfig(BaseModel):
+    roughen_step: float = Field(default=1.0, gt=0.0)
+    roughen_amp: float = Field(default=0.0, ge=0.0)
+
+
+@register_modification("roughen", config_class=RoughenConfig)
 class RoughenMod:
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
-        step = context.config.params.get('roughen_step', 1.0)
-        amp = context.config.params.get('roughen_amp', 0.0)
+        params = context.config.params
+        step = params.roughen_step
+        amp = params.roughen_amp
         return [self._roughen_line(line, step, amp) for line in lines]
 
     def _roughen_line(self, line: LineString, segment_length: float,

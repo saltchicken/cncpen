@@ -107,13 +107,13 @@ def _apply_pattern(step_config: StepConfig, active_lines: List[LineString],
                    poly: Polygon, centroid: Point,
                    max_r: float) -> List[LineString]:
     """Handles geometry extraction, rendering context setup, and pattern generation."""
-    fill_class = FILL_REGISTRY.get(step_config.pattern)
+    registry_entry = FILL_REGISTRY.get(step_config.pattern)
 
-    if not fill_class:
+    if not registry_entry:
         logger.warning(f"    -> Unknown fill pattern '{step_config.pattern}'")
         return active_lines
 
-    filler = fill_class()
+    filler = registry_entry["class"]()
 
     source_geom, new_active_lines = _prepare_source_geometry(
         step_config, active_lines, poly)
@@ -166,14 +166,14 @@ def _apply_modification(step_config: StepConfig, active_lines: List[LineString],
                         poly: Polygon, centroid: Point,
                         max_r: float) -> List[LineString]:
     """Applies a post-processing modification to the current active lines."""
-    mod_class = MODIFICATION_REGISTRY.get(step_config.modification)
+    registry_entry = MODIFICATION_REGISTRY.get(step_config.modification)
 
-    if not mod_class:
+    if not registry_entry:
         logger.warning(
             f"    -> Unknown modification '{step_config.modification}'")
         return active_lines
 
-    mod = mod_class()
+    mod = registry_entry["class"]()
     context = RenderContext(config=step_config,
                             boundary=poly,
                             centroid=centroid,

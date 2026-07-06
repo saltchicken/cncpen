@@ -2,18 +2,26 @@ from typing import List
 
 from shapely.geometry import LineString
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_modification
 from cncpen import RenderContext
 
 
-@register_modification("simplify")
+class SimplifyConfig(BaseModel):
+    tolerance: float = Field(default=0.1, ge=0.0)
+    preserve_topology: bool = Field(default=False)
+
+
+@register_modification("simplify", config_class=SimplifyConfig)
 class SimplifyMod:
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
+        params = context.config.params
 
-        tolerance = context.config.params.get('tolerance', 0.1)
-        preserve = context.config.params.get('preserve_topology', False)
+        tolerance = params.tolerance
+        preserve = params.preserve_topology
 
         simplified_lines = []
 

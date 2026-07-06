@@ -97,26 +97,23 @@ def parse_args() -> JobConfig:
         base_name = os.path.splitext(dxf_file)[0]
         output = f"{base_name}.nc"
 
-    # All explicitly defined dataclass properties
-    known_attrs = {
-        'pattern', 'modification', 'use_previous_lines', 'polygonize',
-        'clip_local', 'replace_previous', 'overscan', 'simplify', 'angle'
-    }
-
     fills = []
     for step in job_config_raw.get('fills', []):
-        step_args = {}
-        params = {}
-
         merged_dict = {**raw_globals, **step}
+        
+        pattern = merged_dict.get('pattern')
+        modification = merged_dict.get('modification')
+        
+        if pattern and pattern in FILL_REGISTRY:
+            config_cls = FILL_REGISTRY[pattern].get('config')
+            if config_cls:
+                merged_dict['params'] = config_cls(**merged_dict)
+        elif modification and modification in MODIFICATION_REGISTRY:
+            config_cls = MODIFICATION_REGISTRY[modification].get('config')
+            if config_cls:
+                merged_dict['params'] = config_cls(**merged_dict)
 
-        for k, v in merged_dict.items():
-            if k in known_attrs:
-                step_args[k] = v
-            else:
-                params[k] = v
-
-        fills.append(StepConfig(**step_args, params=params))
+        fills.append(StepConfig(**merged_dict))
 
     return JobConfig(dxf_file=dxf_file,
                      output=output,

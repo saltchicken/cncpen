@@ -5,17 +5,23 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("grid")
+class GridConfig(BaseModel):
+    cell_size: float = Field(default=2.0, gt=0.0)
+
+
+@register_fill("grid", config_class=GridConfig)
 class GridFill:
     """Generates a standard orthogonal square grid tessellation."""
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        cell_size = context.config.params.get('cell_size', 2.0)
+        cell_size = context.config.params.cell_size
         minx, miny, maxx, maxy = shape.bounds
 
         if cell_size <= 0:

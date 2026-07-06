@@ -9,28 +9,40 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 logger = logging.getLogger(__name__)
 
 
-@register_fill("venation")
+class VenationConfig(BaseModel):
+    seed: int = Field(default=42)
+    density: int = Field(default=400, gt=0)
+    segment_length: float = Field(default=2.0, gt=0.0)
+    attraction_distance: float = Field(default=20.0, gt=0.0)
+    kill_distance: float = Field(default=4.0, gt=0.0)
+    root_x: float | None = None
+    root_y: float | None = None
+    max_iterations: int = Field(default=5000, gt=0)
+
+
+@register_fill("venation", config_class=VenationConfig)
 class VenationFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        # Fetch config parameters
-        seed = context.config.params.get('seed', 42)
-        density = context.config.params.get('density', 400)
+        params = context.config.params
+        seed = params.seed
+        density = params.density
 
         # SAFETY 1: Prevent 0-length steps that go nowhere
-        segment_length = max(0.1,
-                             context.config.params.get('segment_length', 2.0))
-        attraction_dist = context.config.params.get('attraction_distance', 20.0)
+        segment_length = max(0.1, params.segment_length)
+        attraction_dist = params.attraction_distance
 
         # SAFETY 2: Prevent branches from stepping over attractors and oscillating endlessly
-        raw_kill = context.config.params.get('kill_distance', 4.0)
+        raw_kill = params.kill_distance
         kill_dist = max(raw_kill, segment_length * 1.1)
 
         random.seed(seed)
@@ -56,15 +68,15 @@ class VenationFill:
         attractors_np = np.array(attractors)
 
         # 2. Initialize the root node
-        root_x = context.config.params.get('root_x', (minx + maxx) / 2.0)
-        root_y = context.config.params.get('root_y', miny)
+        root_x = params.root_x if params.root_x is not None else (minx + maxx) / 2.0
+        root_y = params.root_y if params.root_y is not None else miny
         nodes = [[root_x, root_y]]
 
         lines = []
         active = True
 
         # SAFETY 3: Circuit breaker to prevent terminal lockups
-        max_iterations = context.config.params.get('max_iterations', 5000)
+        max_iterations = params.max_iterations
         iteration = 0
 
         # 3. Optimized Space Colonization Loop

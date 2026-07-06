@@ -6,13 +6,19 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 PHI = (1.0 + math.sqrt(5.0)) / 2.0
 
 
-@register_fill("penrose")
+class PenroseConfig(BaseModel):
+    depth: int = Field(default=5, ge=1)
+
+
+@register_fill("penrose", config_class=PenroseConfig)
 class PenroseFill:
     """
     Generates an aperiodic Penrose P3 (rhombus-like) tiling pattern
@@ -21,7 +27,7 @@ class PenroseFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        depth = context.config.params.get('depth', 5)
+        depth = context.config.params.depth
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y
 

@@ -4,8 +4,15 @@ import numpy as np
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_modification
 from cncpen import RenderContext
+
+
+class OptimizeConfig(BaseModel):
+    start_x: float = Field(default=0.0)
+    start_y: float = Field(default=0.0)
 
 
 def optimize_paths_nearest_neighbor(
@@ -82,7 +89,7 @@ def optimize_paths_nearest_neighbor(
     return optimized
 
 
-@register_modification("optimize")
+@register_modification("optimize", config_class=OptimizeConfig)
 class OptimizeMod:
 
     def apply(self, lines: List[LineString],
@@ -91,9 +98,10 @@ class OptimizeMod:
             return []
 
         raw_paths = [list(line.coords) for line in lines]
+        params = context.config.params
 
-        start_x = context.config.params.get('start_x', 0.0)
-        start_y = context.config.params.get('start_y', 0.0)
+        start_x = params.start_x
+        start_y = params.start_y
 
         optimized_paths = optimize_paths_nearest_neighbor(raw_paths,
                                                           start_pt=(start_x,

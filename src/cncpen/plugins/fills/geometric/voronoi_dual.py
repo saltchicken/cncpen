@@ -8,20 +8,30 @@ from scipy.spatial import Voronoi
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("voronoi-dual")
+class VoronoiDualConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+    num_points: int = Field(default=0, ge=0)
+    seed: int = Field(default=42)
+    mode: str = Field(default='dual')
+
+
+@register_fill("voronoi-dual", config_class=VoronoiDualConfig)
 class VoronoiDualFill:
     """Generates Voronoi cells, Delaunay triangulations, or both overlaid."""
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        spacing = context.config.params.get('spacing', 2.0)
-        num_points = context.config.params.get('num_points', 0)
-        seed = context.config.params.get('seed', 42)
-        mode = context.config.params.get('mode', 'dual')
+        params = context.config.params
+        spacing = params.spacing
+        num_points = params.num_points
+        seed = params.seed
+        mode = params.mode
         lines = []
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

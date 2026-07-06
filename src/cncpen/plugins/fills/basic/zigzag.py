@@ -3,17 +3,23 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("zigzag")
+class ZigZagConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+
+
+@register_fill("zigzag", config_class=ZigZagConfig)
 class ZigZagFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
-        spacing = context.config.params.get('spacing', 2.0)
+        spacing = context.config.params.spacing
         offset = ((maxy - miny) % spacing) / 2.0
         y = miny + offset + (spacing / 2.0)
         lines = []

@@ -6,20 +6,30 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("sine")
+class SineConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+    amplitude: float = Field(default=1.0, gt=0.0)
+    wavelength: float = Field(default=5.0, gt=0.0)
+    sampler: Any = None
+
+
+@register_fill("sine", config_class=SineConfig)
 class SineFill:
     """Generates back-and-forth sine wave fill paths, optionally modulated by an image."""
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        spacing = context.config.params.get('spacing', 2.0)
-        amplitude = context.config.params.get('amplitude', 1.0)
-        wavelength = context.config.params.get('wavelength', 5.0)
-        sampler = context.config.params.get('sampler', None)
+        params = context.config.params
+        spacing = params.spacing
+        amplitude = params.amplitude
+        wavelength = params.wavelength
+        sampler = params.sampler
 
         minx, miny, maxx, maxy = shape.bounds
         y = miny + spacing

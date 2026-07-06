@@ -8,22 +8,33 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from skimage import measure
 
+from pydantic import BaseModel, Field
+
 from cncpen import ImageSampler
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("photo-concentric")
+class PhotoConcentricConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+    threshold: float = Field(default=0.5)
+    resolution: float = Field(default=0.25, gt=0.0)
+    image: str | None = None
+    sampler: Any = None
+
+
+@register_fill("photo-concentric", config_class=PhotoConcentricConfig)
 class PhotoConcentricFill:
     """Generates geometric concentric fills driven by image boundaries."""
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        sampler = context.config.params.get('sampler', None)
-        spacing = context.config.params.get('spacing', 2.0)
-        threshold = context.config.params.get('threshold', 0.5)
-        resolution = context.config.params.get('resolution', 0.25)
-        image_path = context.config.params.get('image', None)
+        params = context.config.params
+        sampler = params.sampler
+        spacing = params.spacing
+        threshold = params.threshold
+        resolution = params.resolution
+        image_path = params.image
 
         if not sampler and image_path:
             sampler = ImageSampler(image_path, context.bounds)

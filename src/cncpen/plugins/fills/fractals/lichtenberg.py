@@ -8,11 +8,18 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("lichtenberg")
+class LichtenbergConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+    nodes: int = Field(default=1500, gt=0)
+
+
+@register_fill("lichtenberg", config_class=LichtenbergConfig)
 class LichtenbergFill:
     """
     Generates a Lichtenberg-style (branching fractal) fill using an RRT
@@ -21,8 +28,9 @@ class LichtenbergFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        spacing = context.config.params.get('spacing', 2.0)
-        nodes = context.config.params.get('nodes', 1500)
+        params = context.config.params
+        spacing = params.spacing
+        nodes = params.nodes
         minx, miny, maxx, maxy = shape.bounds
         root = shape.centroid
 

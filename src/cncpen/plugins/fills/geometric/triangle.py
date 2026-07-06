@@ -6,17 +6,23 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("triangle")
+class TriangleConfig(BaseModel):
+    cell_size: float = Field(default=5.0, gt=0.0)
+
+
+@register_fill("triangle", config_class=TriangleConfig)
 class TriangleFill:
     """Generates an equilateral triangular (isometric grid) tessellation."""
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        cell_size = context.config.params.get('cell_size', 5.0)
+        cell_size = context.config.params.cell_size
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y
 

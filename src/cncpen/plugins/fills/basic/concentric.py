@@ -3,18 +3,27 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("concentric")
+class ConcentricConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+    ring_simplify: float = Field(default=0.2, ge=0.0)
+    include_base: bool = Field(default=True)
+
+
+@register_fill("concentric", config_class=ConcentricConfig)
 class ConcentricFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
         lines = []
-        spacing = context.config.params.get('spacing', 2.0)
-        ring_simplify = context.config.params.get('ring_simplify', 0.2)
+        params = context.config.params
+        spacing = params.spacing
+        ring_simplify = params.ring_simplify
 
         # --- INWARD CONCENTRIC (Polygons) ---
         if shape.geom_type in ('Polygon', 'MultiPolygon'):
@@ -38,7 +47,7 @@ class ConcentricFill:
             max_dist = context.max_r
             dist = spacing
 
-            if context.config.params.get('include_base', True):
+            if params.include_base:
                 if shape.geom_type == 'LineString':
                     lines.append(shape)
                 elif hasattr(shape, 'geoms'):

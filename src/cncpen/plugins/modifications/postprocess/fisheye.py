@@ -5,16 +5,22 @@ from typing import Any, List
 import argcomplete
 from shapely.geometry import LineString
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_modification
 from cncpen import RenderContext
 
 
-@register_modification("fisheye")
+class FisheyeConfig(BaseModel):
+    fisheye: float = Field(default=0.0)
+
+
+@register_modification("fisheye", config_class=FisheyeConfig)
 class FisheyeMod:
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
-        fisheye = context.config.params.get('fisheye', 0.0)
+        fisheye = context.config.params.fisheye
         if not fisheye or context.max_r <= 0:
             return lines
 

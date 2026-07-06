@@ -6,17 +6,23 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("hexagon")
+class HexagonConfig(BaseModel):
+    radius: float = Field(default=3.0, gt=0.0)
+
+
+@register_fill("hexagon", config_class=HexagonConfig)
 class HexagonFill:
     """Generates a regular hexagonal (honeycomb) tessellation using a heuristic-driven graph traversal to minimize pen lifts."""
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        radius = context.config.params.get('radius', 3.0)
+        radius = context.config.params.radius
         minx, miny, maxx, maxy = shape.bounds
 
         if radius <= 0:

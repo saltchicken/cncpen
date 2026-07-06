@@ -5,18 +5,26 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import ImageSampler
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("photo_hatch")
+class PhotoHatchConfig(BaseModel):
+    cell_size: float = Field(default=2.0, gt=0.0)
+    image: str | None = None
+
+
+@register_fill("photo_hatch", config_class=PhotoHatchConfig)
 class PhotoHatchFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        cell_size = context.config.params.get('cell_size', 2.0)
-        image_path = context.config.params.get('image', None)
+        params = context.config.params
+        cell_size = params.cell_size
+        image_path = params.image
 
         # 2. Check for the image path directly
         if not image_path:

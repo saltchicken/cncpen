@@ -7,11 +7,19 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("zentangle")
+class ZentangleConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+    density: float = Field(default=3.0, gt=0.0)
+    sampler: Any = None
+
+
+@register_fill("zentangle", config_class=ZentangleConfig)
 class ZentangleFill:
     """
     Generates a zoned doodle fill.
@@ -21,9 +29,10 @@ class ZentangleFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        spacing = context.config.params.get('spacing', 2.0)
-        density = context.config.params.get('density', 3.0)
-        sampler = context.config.params.get('sampler', None)
+        params = context.config.params
+        spacing = params.spacing
+        density = params.density
+        sampler = params.sampler
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
 

@@ -6,11 +6,20 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("morphing_grid")
+class MorphingGridConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+    cell_size: float = Field(default=5.0, gt=0.0)
+    morph_cycles: float = Field(default=1.0)
+    sampler: Any = None
+
+
+@register_fill("morphing_grid", config_class=MorphingGridConfig)
 class MorphingGridFill:
     """
     Generates a grid of geometric shapes. Morphs in complexity, scale, and rotation 
@@ -19,10 +28,11 @@ class MorphingGridFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        spacing = context.config.params.get('spacing', 2.0)
-        cell_size = context.config.params.get('cell_size', 5.0)
-        morph_cycles = context.config.params.get('morph_cycles', 1.0)
-        sampler = context.config.params.get('sampler', None)
+        params = context.config.params
+        spacing = params.spacing
+        cell_size = params.cell_size
+        morph_cycles = params.morph_cycles
+        sampler = params.sampler
 
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

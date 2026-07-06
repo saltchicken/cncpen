@@ -4,26 +4,30 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("guilloche")
+class GuillocheConfig(BaseModel):
+    major_radius: float = Field(default=50.0)
+    minor_radius: float = Field(default=-15.0)
+    pen_offset: float = Field(default=25.0)
+    revolutions: int = Field(default=10, gt=0)
+    resolution: float = Field(default=0.05, gt=0.0)
+
+
+@register_fill("guilloche", config_class=GuillocheConfig)
 class GuillocheFill:
     def generate(self, shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         
-        # Core roulette curve parameters
-        # R: Radius of the fixed circle
-        # r: Radius of the rolling circle (negative for hypotrochoid, positive for epitrochoid)
-        # p: Distance from the center of the rolling circle to the pen tip
-        R = params.get('major_radius', 50.0)
-        r = params.get('minor_radius', -15.0)
-        p = params.get('pen_offset', 25.0)
-        
-        # Rendering parameters
-        revolutions = params.get('revolutions', 10)
-        resolution = params.get('resolution', 0.05)  # radians per step
+        R = params.major_radius
+        r = params.minor_radius
+        p = params.pen_offset
+        revolutions = params.revolutions
+        resolution = params.resolution
         
         # Center the pattern on the bounding geometry's centroid
         cx, cy = context.centroid.x, context.centroid.y

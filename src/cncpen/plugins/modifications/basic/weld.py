@@ -2,13 +2,20 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.ops import unary_union
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_modification
 from cncpen import RenderContext
 
-@register_modification("weld")
+
+class WeldConfig(BaseModel):
+    pen_width: float = Field(default=0.2, gt=0.0)
+
+
+@register_modification("weld", config_class=WeldConfig)
 class WeldMod:
     def apply(self, lines: List[LineString], context: RenderContext) -> List[LineString]:
-        pen_width = context.config.params.get('pen_width', 0.2)
+        pen_width = context.config.params.pen_width
         
         # Buffer every line by half the pen width, turning them into polygons
         buffered_polys = [line.buffer(pen_width / 2.0, cap_style=2, join_style=2) for line in lines]

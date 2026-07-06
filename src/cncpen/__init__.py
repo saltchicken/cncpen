@@ -13,19 +13,19 @@ FILL_REGISTRY = {}
 MODIFICATION_REGISTRY = {}
 
 
-def register_fill(name):
+def register_fill(name, config_class=None):
 
     def decorator(cls):
-        FILL_REGISTRY[name] = cls
+        FILL_REGISTRY[name] = {"class": cls, "config": config_class}
         return cls
 
     return decorator
 
 
-def register_modification(name):
+def register_modification(name, config_class=None):
 
     def decorator(cls):
-        MODIFICATION_REGISTRY[name] = cls
+        MODIFICATION_REGISTRY[name] = {"class": cls, "config": config_class}
         return cls
 
     return decorator

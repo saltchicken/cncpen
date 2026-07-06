@@ -7,11 +7,20 @@ from shapely import affinity
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
+from pydantic import BaseModel, Field
+
 from cncpen import register_fill
 from cncpen import RenderContext
 
 
-@register_fill("chaotic")
+class ChaoticConfig(BaseModel):
+    spacing: float = Field(default=2.0, gt=0.0)
+    depth: int = Field(default=4, ge=0)
+    chaos_freq: float = Field(default=0.15)
+    chaos_amp: float = Field(default=0.8)
+
+
+@register_fill("chaotic", config_class=ChaoticConfig)
 class ChaoticFill:
     """
     Generates a highly irregular, fractal-like fill using a base motif that
@@ -20,10 +29,11 @@ class ChaoticFill:
 
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
-        spacing = context.config.params.get('spacing', 2.0)
-        depth = context.config.params.get('depth', 4)
-        chaos_freq = context.config.params.get('chaos_freq', 0.15)
-        chaos_amp = context.config.params.get('chaos_amp', 0.8)
+        params = context.config.params
+        spacing = params.spacing
+        depth = params.depth
+        chaos_freq = params.chaos_freq
+        chaos_amp = params.chaos_amp
 
         minx, miny, maxx, maxy = shape.bounds
         coarse_spacing = max(spacing * 4.0, 1.0)
