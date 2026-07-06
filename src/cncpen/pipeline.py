@@ -112,14 +112,14 @@ def _apply_pattern(step_def: dict, step_config: dict, active_lines: List[LineStr
         step_lines = filler.generate(gen_shape, context)
         
         if clip_local and g.geom_type == 'Polygon':
-            step_lines = apply_clipping(step_lines, boundary=g)
+            step_lines = apply_clipping(step_lines, boundary=gen_shape)
             
         lines.extend(step_lines)
 
     lines = [line for line in lines if not line.is_empty]
     
     # Final clipping and transformation back to world space
-    lines = apply_clipping(lines, boundary=strict_master_boundary)
+    lines = apply_clipping(lines, boundary=context_working_boundary)
     lines = apply_transform(lines, angle=angle, origin=centroid, simplify_tol=step_def.get('simplify', 0.0))
 
     new_active_lines.extend(lines)

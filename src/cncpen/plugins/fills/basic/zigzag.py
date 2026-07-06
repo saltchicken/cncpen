@@ -14,7 +14,8 @@ class ZigZagFill:
                  context: RenderContext) -> List[LineString]:
         minx, miny, maxx, maxy = shape.bounds
         spacing = context.config.get('spacing', 2.0)
-        y = miny + spacing
+        offset = ((maxy - miny) % spacing) / 2.0
+        y = miny + offset + (spacing / 2.0)
         lines = []
         left_to_right = True
 
