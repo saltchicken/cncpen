@@ -28,11 +28,7 @@ class StepConfig(BaseModel):
         if not isinstance(data, dict):
             return data
 
-        known_fields = {
-            'pattern', 'modification', 'use_previous_lines', 'polygonize',
-            'clip_local', 'replace_previous', 'overscan', 'simplify', 'angle',
-            'params'
-        }
+        known_fields = set(cls.model_fields.keys())
 
         step_args = {}
         existing_params = data.get('params')
