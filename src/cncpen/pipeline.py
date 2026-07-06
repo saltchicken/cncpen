@@ -23,7 +23,6 @@ from cncpen.config import StepConfig
 from cncpen.geometry import _ensure_geom
 from cncpen.geometry import apply_clipping
 from cncpen.geometry import apply_transform
-from cncpen.pen import PenTool
 
 logger = logging.getLogger(__name__)
 
