@@ -1,6 +1,5 @@
 fills:
-  - pattern: concentric
-    spacing: 1.0
-  - modification: image_mask
-    mask_image: images/loz.jpg
-    threshold: 0.5
+  - pattern: sine
+    spacing: 3.0
+  - modification: simplify
+    threshold: 0.2

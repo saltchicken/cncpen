@@ -110,7 +110,12 @@ def process_fills(closed_polys: List[Polygon],
                                     simplify_tol=step_def.get('simplify', 0.0))
 
             active_lines.extend(lines)
-            logger.info(f"    -> Generated {len(lines)} lines (Cumulative active lines: {len(active_lines)}) in {time.perf_counter() - step_timer:.3f}s.")
+            step_vertices = sum(len(line.coords) for line in lines)
+            total_vertices = sum(len(line.coords) for line in active_lines)
+
+            logger.info(f"    -> Generated {len(lines)} lines, {step_vertices} vertices "
+                        f"(Cumulative: {len(active_lines)} lines, {total_vertices} vertices) "
+                        f"in {time.perf_counter() - step_timer:.3f}s.")
 
         elif "modification" in step_def:
             mod_name = step_def.get("modification")
@@ -129,10 +134,16 @@ def process_fills(closed_polys: List[Polygon],
                                     max_r=max_r)
 
             initial_line_count = len(active_lines)
+            initial_vertex_count = sum(len(line.coords) for line in active_lines)
+
             active_lines = mod.apply(active_lines, context)
             active_lines = apply_clipping(active_lines, boundary=poly)
+
+            final_vertex_count = sum(len(line.coords) for line in active_lines)
             
-            logger.info(f"    -> Modified {initial_line_count} lines into {len(active_lines)} lines in {time.perf_counter() - step_timer:.3f}s.")
+            logger.info(f"    -> Modified {initial_line_count} lines ({initial_vertex_count} vertices) "
+                        f"into {len(active_lines)} lines ({final_vertex_count} vertices) "
+                        f"in {time.perf_counter() - step_timer:.3f}s.")
 
         else:
             logger.warning(f"  [{step_idx}/{total_steps}] Step must contain 'pattern' or 'modification'. Ignored: {step_def}")
