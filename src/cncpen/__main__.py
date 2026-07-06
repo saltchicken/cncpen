@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-# PYTHON_ARGCOMPLETE_OK
 
-import argparse
-from functools import reduce
 import math
 import operator
 import sys
+from functools import reduce
 from typing import List, Tuple
 
 from shapely import affinity
@@ -14,7 +12,6 @@ from shapely.geometry import Polygon
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
 from cncpen import RenderContext
-from cncpen import ImageSampler
 from cncpen.cli import parse_args
 from cncpen.cli import print_run_parameters
 from cncpen.dxf import DXFReadError
@@ -28,15 +25,14 @@ from cncpen.pen import PenTool
 
 
 def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
-                     args: argparse.Namespace, pen: PenTool) -> List[Polygon]:
+                     config: dict, pen: PenTool) -> List[Polygon]:
     """Draws outlines and extracts closed polygons to be used as fill boundaries."""
     closed_polys: List[Polygon] = []
     
-    # Check if we have any fills defined in the YAML config
-    has_fills = bool(getattr(args, 'job_config', {}).get('fills'))
+    has_fills = bool(config.get('fills'))
 
     for pts in paths_to_draw:
-        if not args.no_outline:
+        if not config.get('no_outline', False):
             pen.draw_path(pts, clearance=True)
 
         if has_fills and len(pts) > 2:
@@ -52,7 +48,7 @@ def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
 
 def process_fills(closed_polys: List[Polygon],
                   paths_to_draw: List[List[Tuple[float, float]]],
-                  args: argparse.Namespace, 
+                  global_config: dict,
                   fill_definitions: List[dict],
                   pen: PenTool) -> None:
     """Handles geometry extraction, sampling, modifications, and generation for fill patterns."""
@@ -80,10 +76,8 @@ def process_fills(closed_polys: List[Polygon],
 
     # --- PROCESS EACH STEP IN THE YAML CONFIG SEQUENTIALLY ---
     for step_def in fill_definitions:
-        # TODO: Make merged_args unnecessary
-        # Merge dictionaries first so step_def overrides global args safely
-        merged_args = {**vars(args), **step_def}
-        context_args = argparse.Namespace(**merged_args)
+        # Merge global config with step parameters
+        step_config = {**global_config, **step_def}
 
         # 1. PROCESS FILL PATTERNS
         if "pattern" in step_def:
@@ -100,7 +94,7 @@ def process_fills(closed_polys: List[Polygon],
             # Local coordinate system for the fill (rotated)
             working_poly = affinity.rotate(poly, -angle, origin=centroid) if angle != 0.0 else poly
 
-            context = RenderContext(args=context_args,
+            context = RenderContext(config=step_config,
                                     boundary=working_poly,
                                     centroid=centroid,
                                     max_r=max_r)
@@ -137,7 +131,7 @@ def process_fills(closed_polys: List[Polygon],
             mod = mod_class()
             
             # Modifications run in global space against the unrotated boundary
-            context = RenderContext(args=context_args,
+            context = RenderContext(config=step_config,
                                     boundary=poly,
                                     centroid=centroid,
                                     max_r=max_r)
@@ -155,7 +149,7 @@ def process_fills(closed_polys: List[Polygon],
     all_raw_fill_coords.extend([list(line.coords) for line in active_lines])
 
     # --- OPTIMIZE ALL LAYERS TOGETHER ---
-    if not args.no_optimize and all_raw_fill_coords:
+    if not global_config.get('no_optimize', False) and all_raw_fill_coords:
         print(f"Optimizing {len(fill_definitions)} fill layer(s)...")
         last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
         all_raw_fill_coords = optimize_paths_nearest_neighbor(all_raw_fill_coords, start_pt=last_pos)
@@ -176,21 +170,20 @@ def print_post_run_stats(output_filename: str) -> None:
     print(f"G-code successfully saved to {output_filename}")
 
 
-
 def main() -> None:
-    args = parse_args()
-    print_run_parameters(args)
+    config = parse_args()
+    print_run_parameters(config)
 
-    print(f"Reading geometry from {args.dxf_file}...")
+    print(f"Reading geometry from {config['dxf_file']}...")
 
     try:
         paths_to_draw = extract_dxf_paths(
-            args.dxf_file, simplify_tolerance=args.outline_simplify)
+            config['dxf_file'], simplify_tolerance=config.get('outline_simplify', 0.0))
     except DXFReadError as e:
         print(f"Fatal Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    if not args.no_optimize:
+    if not config.get('no_optimize', False):
         print("Optimizing outline paths...")
         paths_to_draw = optimize_paths_nearest_neighbor(paths_to_draw)
 
@@ -200,19 +193,19 @@ def main() -> None:
         print("No drawable paths found. Exiting.")
         sys.exit(0)
 
-    config = PenConfig(feed_rate=args.feed)
+    pen_config = PenConfig(feed_rate=config.get('feed', 1200.0))
 
-    with PenTool(config, output_filename=args.output) as pen:
+    with PenTool(pen_config, output_filename=config['output']) as pen:
         # 1. Process Outlines
-        closed_polys = process_outlines(paths_to_draw, args, pen)
+        closed_polys = process_outlines(paths_to_draw, config, pen)
         
         # 2. Extract fills array from YAML config (default to empty list if not found)
-        fill_definitions = args.job_config.get('fills', [])
+        fill_definitions = config.get('fills', [])
         
-        # 3. Process Fills (using the updated loop logic from Approach 1)
-        process_fills(closed_polys, paths_to_draw, args, fill_definitions, pen)
+        # 3. Process Fills
+        process_fills(closed_polys, paths_to_draw, config, fill_definitions, pen)
 
-    print_post_run_stats(args.output)
+    print_post_run_stats(config['output'])
 
 
 if __name__ == "__main__":

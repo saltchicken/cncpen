@@ -1,4 +1,3 @@
-import argparse
 from typing import List
 
 from shapely.geometry import LineString
@@ -11,28 +10,17 @@ from cncpen import RenderContext
 @register_fill("concentric")
 class ConcentricFill:
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--ring-simplify",
-            type=float,
-            default=0.2,
-            help=
-            "Simplification tolerance specific to inner rings (default: 0.2)")
-
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
         lines = []
-        spacing = getattr(context.args, 'spacing', 2.0)
-        ring_simplify = getattr(context.args, 'ring_simplify', 0.2)
+        spacing = context.config.get('spacing', 2.0)
+        ring_simplify = context.config.get('ring_simplify', 0.2)
 
         current_geom = shape.buffer(-spacing).simplify(ring_simplify,
                                                        preserve_topology=False)
 
         while not current_geom.is_empty and current_geom.area > 0:
-            polygons = [current_geom
-                       ] if current_geom.geom_type == 'Polygon' else list(
-                           current_geom.geoms)
+            polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
             for p in polygons:
                 if p.exterior:
                     lines.append(LineString(p.exterior.coords))

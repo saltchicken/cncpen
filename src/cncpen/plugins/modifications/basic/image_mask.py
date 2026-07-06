@@ -1,8 +1,6 @@
-import argparse
 import math
 from typing import List
 
-import argcomplete
 from shapely.geometry import LineString
 
 from cncpen import ImageSampler
@@ -13,28 +11,18 @@ from cncpen import RenderContext
 @register_modification("image_mask")
 class ImageMaskMod:
 
-    @classmethod
-    def setup_cli(cls, group: argparse._ArgumentGroup) -> None:
-        group.add_argument("--mask-image",
-                           default=None,
-                           help="Optional image to modulate fill"
-                          ).completer = argcomplete.completers.FilesCompleter(
-                              allowednames=(".png", ".jpg", ".jpeg"))
-        group.add_argument("--threshold",
-                           type=float,
-                           default=0.5,
-                           help="Darkness cutoff")
-
-    def is_active(self, args: argparse.Namespace) -> bool:
-        return bool(getattr(args, 'mask_image', None))
+    def is_active(self, config: dict) -> bool:
+        return bool(config.get('mask_image'))
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
-        if not context.args.mask_image:
+        
+        mask_image = context.config.get('mask_image')
+        if not mask_image:
             return lines
 
-        mask_sampler = ImageSampler(context.args.mask_image, context.bounds)
-        threshold = context.args.threshold
+        mask_sampler = ImageSampler(mask_image, context.bounds)
+        threshold = context.config.get('threshold', 0.5)
         masked_lines = []
         step_res = 1.0
 

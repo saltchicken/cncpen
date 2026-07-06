@@ -1,12 +1,6 @@
 fills:
-  - pattern: lichtenberg
+  - pattern: zigzag
     spacing: 1.0
-    nodes: 5000
   - modification: image_mask
     mask_image: images/loz.jpg
     threshold: 0.5
-  - pattern: photo-contour
-    image: images/loz.jpg
-    levels: 1
-    simplify: 0.5
-    resolution: 0.05

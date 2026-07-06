@@ -1,4 +1,3 @@
-import argparse
 from dataclasses import dataclass
 from typing import Any, List, Protocol
 
@@ -56,7 +55,7 @@ class ImageSampler:
 @dataclass
 class RenderContext:
     """Holds read-only state for the current fill operation."""
-    args: argparse.Namespace
+    config: dict
     boundary: Polygon
     centroid: Point
     max_r: float
@@ -68,10 +67,6 @@ class RenderContext:
 
 class FillPattern(Protocol):
 
-    @classmethod
-    def setup_cli(cls, parser: argparse.ArgumentParser) -> None:
-        ...
-
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
         ...
@@ -79,11 +74,7 @@ class FillPattern(Protocol):
 
 class PathModification(Protocol):
 
-    @classmethod
-    def setup_cli(cls, parser: argparse._ArgumentGroup) -> None:
-        ...
-
-    def is_active(self, args: argparse.Namespace) -> bool:
+    def is_active(self, config: dict) -> bool:
         ...
 
     def apply(self, lines: List[LineString],

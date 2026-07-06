@@ -3,9 +3,6 @@ import importlib
 import os
 import yaml
 import pkgutil
-from typing import Any
-
-import argcomplete
 
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
@@ -24,52 +21,42 @@ def load_plugins() -> None:
             importlib.import_module(name)
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> dict:
     load_plugins()
 
     parser = argparse.ArgumentParser(
         description="Generate CNC G-code from a DXF file using a pen tool.")
 
-    # Core settings
-    parser.add_argument("dxf_file", help="Path to the input DXF file"
-    ).completer = argcomplete.completers.FilesCompleter(allowednames=(".dxf",))
-    
-    parser.add_argument("-c", "--config", 
-                        required=True, 
-                        help="Path to YAML job configuration file"
-    ).completer = argcomplete.completers.FilesCompleter(allowednames=(".yaml", ".yml"))
+    # Core required files only
+    parser.add_argument("dxf_file", help="Path to the input DXF file")
+    parser.add_argument("-c", "--config", required=True, help="Path to YAML job configuration file")
 
-    parser.add_argument("-o", "--output", default=None, help="Output G-code filename")
-    parser.add_argument("--feed", type=float, default=1200.0, help="Drawing feed rate (default: 1200.0)")
-    parser.add_argument("--no-optimize", action="store_true", help="Disable optimize algorithm")
-    parser.add_argument("--outline-simplify", type=float, default=0.0, help="Simplification tolerance for outlines")
-    parser.add_argument("--no-outline", action="store_true", help="Disable drawing original DXF paths")
-
-    # Modifications (Global Modifiers)
-    mod_group = parser.add_argument_group("Path Modifications (Plugins)")
-    for mod_name, mod_class in MODIFICATION_REGISTRY.items():
-        mod_class.setup_cli(mod_group)
-
-    argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    # Load and attach the YAML config
+    # Load the YAML config
     try:
         with open(args.config, 'r') as f:
-            args.job_config = yaml.safe_load(f) or {}
+            job_config = yaml.safe_load(f) or {}
     except Exception as e:
         parser.error(f"Failed to read YAML config: {e}")
 
-    if args.output is None:
+    # Build a consolidated config dictionary
+    config = job_config.get('globals', {})
+    config['dxf_file'] = args.dxf_file
+    config['fills'] = job_config.get('fills', [])
+
+    if 'output' not in config:
         base_name = os.path.splitext(args.dxf_file)[0]
-        args.output = f"{base_name}.nc"
+        config['output'] = f"{base_name}.nc"
 
-    return args
+    return config
 
 
-def print_run_parameters(args: argparse.Namespace) -> None:
-    """Prints the runtime arguments to the console."""
+def print_run_parameters(config: dict) -> None:
+    """Prints the runtime configuration to the console."""
     print("--- Run Parameters ---")
-    for key, value in vars(args).items():
-        print(f"{key}: {value}")
+    for key, value in config.items():
+        if key != "fills":
+            print(f"{key}: {value}")
+    print(f"fills: {len(config.get('fills', []))} steps defined")
     print("----------------------\n")
