@@ -7,7 +7,7 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext
 
 
 @register_fill("zentangle")
@@ -19,10 +19,10 @@ class ZentangleFill:
     """
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        spacing = context.config.get('spacing', 2.0)
-        density = context.config.get('density', 3.0)
-        sampler = context.config.get('sampler', None)
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.config.params.get('spacing', 2.0)
+        density = context.config.params.get('density', 3.0)
+        sampler = context.config.params.get('sampler', None)
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
 

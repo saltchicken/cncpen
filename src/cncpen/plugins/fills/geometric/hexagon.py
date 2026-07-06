@@ -6,7 +6,7 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext
 
 
 @register_fill("hexagon")
@@ -14,8 +14,8 @@ class HexagonFill:
     """Generates a regular hexagonal (honeycomb) tessellation using a heuristic-driven graph traversal to minimize pen lifts."""
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        radius = context.config.get('radius', 3.0)
+                 context: RenderContext) -> List[LineString]:
+        radius = context.config.params.get('radius', 3.0)
         minx, miny, maxx, maxy = shape.bounds
 
         if radius <= 0:

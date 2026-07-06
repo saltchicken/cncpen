@@ -7,7 +7,7 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
 
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext
 
 
 @register_fill("chladni")
@@ -18,13 +18,13 @@ class ChladniFill:
     """
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        n = context.config.get('n', 3.0)
-        m = context.config.get('m', 5.0)
-        sign = context.config.get('sign', -1.0)
-        res = context.config.get('res', 0.5)
-        simplify = context.config.get('simplify', 0.0)
-        sampler = context.config.get('sampler', None)
+                 context: RenderContext) -> List[LineString]:
+        n = context.config.params.get('n', 3.0)
+        m = context.config.params.get('m', 5.0)
+        sign = context.config.params.get('sign', -1.0)
+        res = context.config.params.get('res', 0.5)
+        simplify = context.config.params.get('simplify', 0.0)
+        sampler = context.config.params.get('sampler', None)
 
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

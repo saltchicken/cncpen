@@ -7,7 +7,7 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext
 
 
 @register_fill("sacred")
@@ -15,8 +15,8 @@ class SacredFill:
     """Generates a Flower of Life (overlapping circles) sacred geometry fill."""
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        radius = max(context.config.get('spacing', 2.0), 0.1)
+                 context: RenderContext) -> List[LineString]:
+        radius = max(context.config.params.get('spacing', 2.0), 0.1)
         minx, miny, maxx, maxy = shape.bounds
         dx = radius
         dy = radius * math.sqrt(3) / 2.0

@@ -7,7 +7,7 @@ from shapely import affinity
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext
 
 
 @register_fill("chaotic")
@@ -18,11 +18,11 @@ class ChaoticFill:
     """
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        spacing = context.config.get('spacing', 2.0)
-        depth = context.config.get('depth', 4)
-        chaos_freq = context.config.get('chaos_freq', 0.15)
-        chaos_amp = context.config.get('chaos_amp', 0.8)
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.config.params.get('spacing', 2.0)
+        depth = context.config.params.get('depth', 4)
+        chaos_freq = context.config.params.get('chaos_freq', 0.15)
+        chaos_amp = context.config.params.get('chaos_amp', 0.8)
 
         minx, miny, maxx, maxy = shape.bounds
         coarse_spacing = max(spacing * 4.0, 1.0)

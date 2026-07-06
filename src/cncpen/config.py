@@ -17,20 +17,8 @@ class StepConfig:
     simplify: float = 0.0
     angle: float = 0.0
     
-    # Store arbitrary plugin-specific parameters here (e.g., 'density', 'spacing')
+    # Store arbitrary plugin-specific parameters here
     params: Dict[str, Any] = field(default_factory=dict)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """
-        Fallback dict-style getter. Checks strongly typed attributes first, 
-        then falls back to the dynamic params dictionary. This ensures 
-        backwards compatibility with existing plugins.
-        """
-        if hasattr(self, key) and key != "params":
-            val = getattr(self, key)
-            if not callable(val) and val is not None:
-                return val
-        return self.params.get(key, default)
 
 
 @dataclass

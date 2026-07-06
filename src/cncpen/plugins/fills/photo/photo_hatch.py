@@ -5,17 +5,16 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import ImageSampler
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext, ImageSampler
 
 
 @register_fill("photo_hatch")
 class PhotoHatchFill:
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        cell_size = context.config.get('cell_size', 2.0)
-        image_path = context.config.get('image', None)
+                 context: RenderContext) -> List[LineString]:
+        cell_size = context.config.params.get('cell_size', 2.0)
+        image_path = context.config.params.get('image', None)
 
         # 2. Check for the image path directly
         if not image_path:

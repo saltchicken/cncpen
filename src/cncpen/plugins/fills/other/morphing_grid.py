@@ -6,7 +6,7 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext
 
 
 @register_fill("morphing_grid")
@@ -17,11 +17,11 @@ class MorphingGridFill:
     """
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        spacing = context.config.get('spacing', 2.0)
-        cell_size = context.config.get('cell_size', 5.0)
-        morph_cycles = context.config.get('morph_cycles', 1.0)
-        sampler = context.config.get('sampler', None)
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.config.params.get('spacing', 2.0)
+        cell_size = context.config.params.get('cell_size', 5.0)
+        morph_cycles = context.config.params.get('morph_cycles', 1.0)
+        sampler = context.config.params.get('sampler', None)
 
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx

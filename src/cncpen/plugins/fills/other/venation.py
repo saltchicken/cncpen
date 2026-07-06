@@ -9,8 +9,7 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
-from cncpen import RenderContext
+from cncpen import register_fill, RenderContext
 
 logger = logging.getLogger(__name__)
 
@@ -21,15 +20,15 @@ class VenationFill:
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
         # Fetch config parameters
-        seed = context.config.get('seed', 42)
-        density = context.config.get('density', 400)
+        seed = context.config.params.get('seed', 42)
+        density = context.config.params.get('density', 400)
 
         # SAFETY 1: Prevent 0-length steps that go nowhere
-        segment_length = max(0.1, context.config.get('segment_length', 2.0))
-        attraction_dist = context.config.get('attraction_distance', 20.0)
+        segment_length = max(0.1, context.config.params.get('segment_length', 2.0))
+        attraction_dist = context.config.params.get('attraction_distance', 20.0)
 
         # SAFETY 2: Prevent branches from stepping over attractors and oscillating endlessly
-        raw_kill = context.config.get('kill_distance', 4.0)
+        raw_kill = context.config.params.get('kill_distance', 4.0)
         kill_dist = max(raw_kill, segment_length * 1.1)
 
         random.seed(seed)
@@ -55,15 +54,15 @@ class VenationFill:
         attractors_np = np.array(attractors)
 
         # 2. Initialize the root node
-        root_x = context.config.get('root_x', (minx + maxx) / 2.0)
-        root_y = context.config.get('root_y', miny)
+        root_x = context.config.params.get('root_x', (minx + maxx) / 2.0)
+        root_y = context.config.params.get('root_y', miny)
         nodes = [[root_x, root_y]]
 
         lines = []
         active = True
 
         # SAFETY 3: Circuit breaker to prevent terminal lockups
-        max_iterations = context.config.get('max_iterations', 5000)
+        max_iterations = context.config.params.get('max_iterations', 5000)
         iteration = 0
 
         # 3. Optimized Space Colonization Loop

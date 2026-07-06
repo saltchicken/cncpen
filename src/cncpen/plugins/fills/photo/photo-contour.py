@@ -7,8 +7,7 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from skimage import measure
 
-from cncpen import ImageSampler
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext, ImageSampler
 
 
 @register_fill("photo-contour")
@@ -16,12 +15,12 @@ class PhotoContourFill:
     """Generates topographic contours driven by image darkness."""
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        sampler = context.config.get('sampler', None)
-        levels = context.config.get('levels', 15)
-        resolution = context.config.get('resolution', 0.5)
-        min_length = context.config.get('min_length', 2.0)
-        image_path = context.config.get('image', None)
+                 context: RenderContext) -> List[LineString]:
+        sampler = context.config.params.get('sampler', None)
+        levels = context.config.params.get('levels', 15)
+        resolution = context.config.params.get('resolution', 0.5)
+        min_length = context.config.params.get('min_length', 2.0)
+        image_path = context.config.params.get('image', None)
 
         if not sampler and image_path:
             sampler = ImageSampler(image_path, context.bounds)

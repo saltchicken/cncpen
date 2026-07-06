@@ -3,9 +3,7 @@ from typing import List
 
 from shapely.geometry import LineString
 
-from cncpen import ImageSampler
-from cncpen import register_modification
-from cncpen import RenderContext
+from cncpen import register_modification, RenderContext, ImageSampler
 
 
 @register_modification("image_mask")
@@ -14,12 +12,12 @@ class ImageMaskMod:
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
 
-        mask_image = context.config.get('mask_image')
+        mask_image = context.config.params.get('mask_image')
         if not mask_image:
             return lines
 
         mask_sampler = ImageSampler(mask_image, context.bounds)
-        threshold = context.config.get('threshold', 0.5)
+        threshold = context.config.params.get('threshold', 0.5)
         masked_lines = []
         step_res = 1.0
 

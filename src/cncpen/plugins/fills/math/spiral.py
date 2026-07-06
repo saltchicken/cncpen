@@ -6,7 +6,7 @@ import argcomplete
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext
 
 
 @register_fill("spiral")
@@ -14,9 +14,9 @@ class SpiralFill:
     """Generates an Archimedean spiral outward from the shape's centroid."""
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        spacing = context.config.get('spacing', 2.0)
-        resolution = context.config.get('resolution', 0.5)
+                 context: RenderContext) -> List[LineString]:
+        spacing = context.config.params.get('spacing', 2.0)
+        resolution = context.config.params.get('resolution', 0.5)
 
         # Fallback to prevent infinite loops if invalid arguments are passed
         if spacing <= 0.01:

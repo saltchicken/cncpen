@@ -8,8 +8,7 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from skimage import measure
 
-from cncpen import ImageSampler
-from cncpen import register_fill
+from cncpen import register_fill, RenderContext, ImageSampler
 
 
 @register_fill("photo-concentric")
@@ -17,12 +16,12 @@ class PhotoConcentricFill:
     """Generates geometric concentric fills driven by image boundaries."""
 
     def generate(self, shape: BaseGeometry,
-                 context: 'RenderContext') -> List[LineString]:
-        sampler = context.config.get('sampler', None)
-        spacing = context.config.get('spacing', 2.0)
-        threshold = context.config.get('threshold', 0.5)
-        resolution = context.config.get('resolution', 0.25)
-        image_path = context.config.get('image', None)
+                 context: RenderContext) -> List[LineString]:
+        sampler = context.config.params.get('sampler', None)
+        spacing = context.config.params.get('spacing', 2.0)
+        threshold = context.config.params.get('threshold', 0.5)
+        resolution = context.config.params.get('resolution', 0.25)
+        image_path = context.config.params.get('image', None)
 
         if not sampler and image_path:
             sampler = ImageSampler(image_path, context.bounds)

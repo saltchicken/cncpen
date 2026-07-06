@@ -5,8 +5,7 @@ from typing import Any, List
 import argcomplete
 from shapely.geometry import LineString
 
-from cncpen import register_modification
-from cncpen import RenderContext
+from cncpen import register_modification, RenderContext
 
 
 @register_modification("fisheye")
@@ -14,7 +13,7 @@ class FisheyeMod:
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
-        fisheye = context.config.get('fisheye', 0.0)
+        fisheye = context.config.params.get('fisheye', 0.0)
         if not fisheye or context.max_r <= 0:
             return lines
 

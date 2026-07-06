@@ -3,8 +3,7 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
-from cncpen import RenderContext
+from cncpen import register_fill, RenderContext
 
 
 @register_fill("concentric")
@@ -13,8 +12,8 @@ class ConcentricFill:
     def generate(self, shape: BaseGeometry,
                  context: RenderContext) -> List[LineString]:
         lines = []
-        spacing = context.config.get('spacing', 2.0)
-        ring_simplify = context.config.get('ring_simplify', 0.2)
+        spacing = context.config.params.get('spacing', 2.0)
+        ring_simplify = context.config.params.get('ring_simplify', 0.2)
 
         # --- INWARD CONCENTRIC (Polygons) ---
         if shape.geom_type in ('Polygon', 'MultiPolygon'):
@@ -38,9 +37,7 @@ class ConcentricFill:
             max_dist = context.max_r
             dist = spacing
 
-            # Optionally preserve the original line in the output
-            # Defaults to True so the base path isn't lost if the previous step cleared it
-            if context.config.get('include_base', True):
+            if context.config.params.get('include_base', True):
                 if shape.geom_type == 'LineString':
                     lines.append(shape)
                 elif hasattr(shape, 'geoms'):
@@ -48,7 +45,6 @@ class ConcentricFill:
                         [g for g in shape.geoms if g.geom_type == 'LineString'])
 
             while dist <= max_dist:
-                # Buffer outward to create a polygon, then trace its boundary
                 current_geom = shape.buffer(dist).simplify(
                     ring_simplify, preserve_topology=False)
 
