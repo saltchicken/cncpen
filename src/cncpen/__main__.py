@@ -109,6 +109,7 @@ def process_fills(closed_polys: List[Polygon],
         lines = apply_clipping(lines, boundary=working_poly)
 
         # 3. Apply Modification Plugins (Dynamic execution)
+        # TODO: handle this with the job.yaml file. I want to mix and match with fills
         for mod_name, mod_class in MODIFICATION_REGISTRY.items():
             mod = mod_class()
             if mod.is_active(context_args):
