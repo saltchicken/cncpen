@@ -37,17 +37,6 @@ def process_outlines(paths_to_draw: List[List[Tuple[float, float]]],
     return closed_polys
 
 
-def print_post_run_stats(output_filename: str) -> None:
-    """Reads the generated file to log runtime statistics."""
-    try:
-        with open(output_filename, 'r') as f:
-            logger.info(f"Total G-code lines produced: {sum(1 for _ in f)}")
-    except Exception as e:
-        logger.warning(f"Could not count lines in output file: {e}")
-
-    logger.info(f"G-code successfully saved to {output_filename}")
-
-
 def main() -> None:
     # Set up the base configuration for logging output
     logging.basicConfig(
@@ -55,6 +44,7 @@ def main() -> None:
         format='%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%H:%M:%S'
     )
+    logging.getLogger('ezdxf').setLevel(logging.WARNING)
 
     total_start = time.perf_counter()
     config = parse_args()
@@ -77,6 +67,7 @@ def main() -> None:
 
     pen_config = PenConfig(feed_rate=config.get('feed', 1200.0))
 
+    # The PenTool context manager now automatically handles logging file stats upon exit
     with PenTool(pen_config, output_filename=config['output']) as pen:
         
         logger.info("Processing outlines...")
@@ -91,7 +82,6 @@ def main() -> None:
         process_fills(closed_polys, config, fill_definitions, pen)
         logger.info(f"Fills processed in {time.perf_counter() - step_start:.3f}s.")
 
-    print_post_run_stats(config['output'])
     logger.info(f"Total execution time: {time.perf_counter() - total_start:.3f}s.")
 
 

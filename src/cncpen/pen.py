@@ -1,8 +1,10 @@
+import logging
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from gscrib import GCodeBuilder
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class PenConfig:
@@ -20,6 +22,7 @@ class PenTool:
                  output_filename: str = "output.nc") -> None:
         self.g = GCodeBuilder(output=output_filename)
         self.config = config
+        self.output_filename = output_filename  # Store for use in __exit__
         self.current_z: Optional[float] = None
 
     def __enter__(self) -> "PenTool":
@@ -31,6 +34,16 @@ class PenTool:
         self.tool_off(clearance=True)
         self._build_postamble()
         self.g.flush()
+
+        # Only log success stats if no exception caused the exit
+        if exc_type is None:
+            try:
+                with open(self.output_filename, 'r') as f:
+                    logger.info(f"Total G-code lines produced: {sum(1 for _ in f)}")
+            except Exception as e:
+                logger.warning(f"Could not count lines in output file: {e}")
+
+            logger.info(f"G-code successfully saved to {self.output_filename}")
 
     def _build_preamble(self) -> None:
         self.g.set_plane('xy')

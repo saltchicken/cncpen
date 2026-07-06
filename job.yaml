@@ -1,7 +1,7 @@
 fills:
   - pattern: grid
     cell_size: 50.0
-    overscan: 25
+    overscan: 10
   - pattern: zigzag
     angle: 30
     use_previous_lines: true
