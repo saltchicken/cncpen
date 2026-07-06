@@ -1,0 +1,17 @@
+globals:
+  outline_simplify: 0.05
+  no_outline: false
+
+fills:
+  # Base structural rings
+  - pattern: concentric
+    spacing: 1.5
+    ring_simplify: 0.1
+  
+  # Dense internal complexity
+  - pattern: voronoi
+    density: 50
+    seed: 42
+    
+  # Minimize travel time between the scattered Voronoi cells
+  - modification: optimize

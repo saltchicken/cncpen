@@ -1,0 +1,29 @@
+globals:
+  feed: 1500.0
+  outline_simplify: 0.1
+
+fills:
+  # Core radial geometry
+  - pattern: sacred
+    type: seed_of_life
+    spacing: 50
+
+  # Continuous sweeping paths 
+  - pattern: spiral
+    pitch: 20.0
+    angle: 70.0
+    spacing: 10
+    resolution: 0.1
+
+  # Warp the center outward
+  - modification: fisheye
+    strength: 1.5
+    center_x: 0.0
+    center_y: 0.0
+    
+
+  - modification: simplify
+    tolerance: 20.0
+    preserve_topology: false
+
+  - modification: optimize
