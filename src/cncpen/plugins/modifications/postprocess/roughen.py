@@ -20,10 +20,7 @@ class RoughenMod:
               context: RenderContext) -> List[LineString]:
         step = context.config.get('roughen_step', 1.0)
         amp = context.config.get('roughen_amp', 0.0)
-        return [
-            self._roughen_line(line, step, amp)
-            for line in lines
-        ]
+        return [self._roughen_line(line, step, amp) for line in lines]
 
     def _roughen_line(self, line: LineString, segment_length: float,
                       amplitude: float) -> LineString:

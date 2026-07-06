@@ -16,7 +16,7 @@ class ImageMaskMod:
 
     def apply(self, lines: List[LineString],
               context: RenderContext) -> List[LineString]:
-        
+
         mask_image = context.config.get('mask_image')
         if not mask_image:
             return lines

@@ -19,7 +19,9 @@ class ZigZagFill:
         left_to_right = True
 
         while y <= maxy:
-            x_start, x_end = (minx - 1, maxx + 1) if left_to_right else (maxx + 1, minx - 1)
+            x_start, x_end = (minx - 1,
+                              maxx + 1) if left_to_right else (maxx + 1,
+                                                               minx - 1)
             lines.append(LineString([(x_start, y), (x_end, y)]))
             y += spacing
             left_to_right = not left_to_right

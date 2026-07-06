@@ -20,7 +20,9 @@ class ConcentricFill:
                                                        preserve_topology=False)
 
         while not current_geom.is_empty and current_geom.area > 0:
-            polygons = [current_geom] if current_geom.geom_type == 'Polygon' else list(current_geom.geoms)
+            polygons = [current_geom
+                       ] if current_geom.geom_type == 'Polygon' else list(
+                           current_geom.geoms)
             for p in polygons:
                 if p.exterior:
                     lines.append(LineString(p.exterior.coords))

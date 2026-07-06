@@ -1,8 +1,9 @@
 import argparse
 import importlib
 import os
-import yaml
 import pkgutil
+
+import yaml
 
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
@@ -29,7 +30,10 @@ def parse_args() -> dict:
 
     # Core required files only
     parser.add_argument("dxf_file", help="Path to the input DXF file")
-    parser.add_argument("-c", "--config", required=True, help="Path to YAML job configuration file")
+    parser.add_argument("-c",
+                        "--config",
+                        required=True,
+                        help="Path to YAML job configuration file")
 
     args = parser.parse_args()
 
@@ -50,4 +54,3 @@ def parse_args() -> dict:
         config['output'] = f"{base_name}.nc"
 
     return config
-
