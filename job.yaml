@@ -1,16 +1,12 @@
-# job.yaml
 fills:
+  - pattern: lichtenberg
+    spacing: 1.0
+    nodes: 5000
+  - modification: image_mask
+    mask_image: images/loz.jpg
+    threshold: 0.5
   - pattern: photo-contour
     image: images/loz.jpg
     levels: 1
     simplify: 0.5
     resolution: 0.05
-
-  - pattern: lichtenberg
-    spacing: 1.0
-    nodes: 5000
-  #
-  # # Third pass: Inner concentric rings
-  # - pattern: concentric
-  #   spacing: 1.5
-  #   ring_simplify: 0.1

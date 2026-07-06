@@ -74,58 +74,85 @@ def process_fills(closed_polys: List[Polygon],
     max_r = math.hypot(global_maxx - global_minx, global_maxy - global_miny) / 2.0
 
     all_raw_fill_coords = []
+    
+    # Maintain a running pipeline of geometry
+    active_lines = []
 
-    # --- LOOP OVER EACH FILL PASS IN THE YAML CONFIG ---
-    for fill_def in fill_definitions:
-        pattern_name = fill_def.get("pattern")
-        fill_class = FILL_REGISTRY.get(pattern_name)
+    # --- PROCESS EACH STEP IN THE YAML CONFIG SEQUENTIALLY ---
+    for step_def in fill_definitions:
+        # TODO: Make merged_args unnecessary
+        # Merge dictionaries first so step_def overrides global args safely
+        merged_args = {**vars(args), **step_def}
+        context_args = argparse.Namespace(**merged_args)
 
-        if not fill_class:
-            print(f"Warning: Unknown fill pattern '{pattern_name}'", file=sys.stderr)
-            continue
+        # 1. PROCESS FILL PATTERNS
+        if "pattern" in step_def:
+            pattern_name = step_def.get("pattern")
+            fill_class = FILL_REGISTRY.get(pattern_name)
 
-        filler = fill_class()
-        angle = fill_def.get('angle', 0.0)
+            if not fill_class:
+                print(f"Warning: Unknown fill pattern '{pattern_name}'", file=sys.stderr)
+                continue
 
-        # Create a combined namespace of global args + this specific fill's parameters
-        context_args = argparse.Namespace(**vars(args), **fill_def)
+            filler = fill_class()
+            angle = step_def.get('angle', 0.0)
 
-        working_poly = affinity.rotate(poly, -angle, origin=centroid) if angle != 0.0 else poly
+            # Local coordinate system for the fill (rotated)
+            working_poly = affinity.rotate(poly, -angle, origin=centroid) if angle != 0.0 else poly
 
-        context = RenderContext(args=context_args,
-                                boundary=working_poly,
-                                centroid=centroid,
-                                max_r=max_r)
+            context = RenderContext(args=context_args,
+                                    boundary=working_poly,
+                                    centroid=centroid,
+                                    max_r=max_r)
 
-        # 1. Generate base lines
-        lines = []
-        polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
-        for p in polygons:
-            lines.extend(filler.generate(p, context))
+            # Generate base lines
+            lines = []
+            polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
+            for p in polygons:
+                lines.extend(filler.generate(p, context))
 
-        lines = [line for line in lines if not line.is_empty]
+            lines = [line for line in lines if not line.is_empty]
 
-        # 2. Clip lines against boundary
-        lines = apply_clipping(lines, boundary=working_poly)
+            # Clip lines against rotated boundary
+            lines = apply_clipping(lines, boundary=working_poly)
 
-        # 3. Apply Modification Plugins (Dynamic execution)
-        # TODO: handle this with the job.yaml file. I want to mix and match with fills
-        for mod_name, mod_class in MODIFICATION_REGISTRY.items():
+            # Transform Output (Rotation & Simplify) back to global space
+            lines = apply_transform(lines,
+                                    angle=angle,
+                                    origin=centroid,
+                                    simplify_tol=step_def.get('simplify', 0.0))
+
+            # Add to our running pipeline
+            active_lines.extend(lines)
+
+        # 2. PROCESS PATH MODIFICATIONS
+        elif "modification" in step_def:
+            mod_name = step_def.get("modification")
+            mod_class = MODIFICATION_REGISTRY.get(mod_name)
+            
+            if not mod_class:
+                print(f"Warning: Unknown modification '{mod_name}'", file=sys.stderr)
+                continue
+
             mod = mod_class()
-            if mod.is_active(context_args):
-                lines = mod.apply(lines, context)
+            
+            # Modifications run in global space against the unrotated boundary
+            context = RenderContext(args=context_args,
+                                    boundary=poly,
+                                    centroid=centroid,
+                                    max_r=max_r)
 
-        # 4. Apply clipping again AFTER modifications
-        lines = apply_clipping(lines, boundary=working_poly)
+            # Apply modification to all currently accumulated lines
+            active_lines = mod.apply(active_lines, context)
+            
+            # Clip again in case the modification pushed lines outside boundary limits
+            active_lines = apply_clipping(active_lines, boundary=poly)
+            
+        else:
+            print(f"Warning: Step must contain 'pattern' or 'modification'. Ignored: {step_def}", file=sys.stderr)
 
-        # 5. Transform Output (Rotation & Simplify)
-        lines = apply_transform(lines,
-                                angle=angle,
-                                origin=centroid,
-                                simplify_tol=fill_def.get('simplify', 0.0))
-
-        # Accumulate coordinates for this fill layer
-        all_raw_fill_coords.extend([list(line.coords) for line in lines])
+    # Accumulate finalized coordinates
+    all_raw_fill_coords.extend([list(line.coords) for line in active_lines])
 
     # --- OPTIMIZE ALL LAYERS TOGETHER ---
     if not args.no_optimize and all_raw_fill_coords:
