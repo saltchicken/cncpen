@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import sys
 from typing import List, Tuple, Union
@@ -7,6 +8,8 @@ from ezdxf.path import make_path
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 from shapely.ops import linemerge
+
+logger = logging.getLogger(__name__)
 
 
 class DXFReadError(Exception):
@@ -38,9 +41,7 @@ def extract_dxf_paths(
                 if len(vertices) > 1:
                     raw_lines.append(LineString([(v.x, v.y) for v in vertices]))
             except Exception as e:
-                print(
-                    f"Warning: could not process {entity.dxftype()} entity: {e}",
-                    file=sys.stderr)
+                logger.warning(f"Could not process {entity.dxftype()} entity: {e}")
 
     if not raw_lines:
         return []
