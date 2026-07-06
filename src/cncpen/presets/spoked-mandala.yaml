@@ -23,7 +23,7 @@ fills:
     
 
   - modification: simplify
-    tolerance: 20.0
+    tolerance: 0.5
     preserve_topology: false
 
   - modification: optimize
