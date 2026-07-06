@@ -2,8 +2,8 @@ import argparse
 import importlib.resources as pkg_resources
 import os
 
-import yaml
 import argcomplete
+import yaml
 
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
@@ -27,7 +27,7 @@ def preset_completer(prefix, parsed_args, **kwargs):
     """Provide a dictionary of preset names and descriptions for argcomplete."""
     base_path = pkg_resources.files('cncpen.presets')
     presets = get_available_presets(base_path)
-    
+
     completions = {}
     for name, filepath in presets.items():
         description = "No description provided"
@@ -37,10 +37,10 @@ def preset_completer(prefix, parsed_args, **kwargs):
             if isinstance(config, dict) and 'description' in config:
                 description = config['description']
         except Exception:
-            pass # Fallback to default if the file is malformed or unreadable
-            
+            pass  # Fallback to default if the file is malformed or unreadable
+
         completions[name] = description
-        
+
     return completions
 
 
@@ -56,11 +56,12 @@ def parse_args() -> JobConfig:
     group.add_argument("-c",
                        "--config",
                        help="Path to a custom YAML job configuration file")
-    
+
     # Attach the custom completer to the preset argument
     group.add_argument("-p",
                        "--preset",
-                       help="Name of a built-in preset (e.g., 'contour')").completer = preset_completer
+                       help="Name of a built-in preset (e.g., 'contour')"
+                      ).completer = preset_completer
 
     # Initialize argcomplete before parsing arguments
     argcomplete.autocomplete(parser)
@@ -100,10 +101,10 @@ def parse_args() -> JobConfig:
     fills = []
     for step in job_config_raw.get('fills', []):
         merged_dict = {**raw_globals, **step}
-        
+
         pattern = merged_dict.get('pattern')
         modification = merged_dict.get('modification')
-        
+
         if pattern and pattern in FILL_REGISTRY:
             config_cls = FILL_REGISTRY[pattern].get('config')
             if config_cls:

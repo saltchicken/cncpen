@@ -1,10 +1,10 @@
 from typing import Any, List, Tuple
 
 import numpy as np
+from pydantic import BaseModel
+from pydantic import Field
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
-
-from pydantic import BaseModel, Field
 
 from cncpen import register_modification
 from cncpen import RenderContext

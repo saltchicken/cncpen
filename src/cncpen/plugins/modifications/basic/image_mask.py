@@ -1,9 +1,9 @@
 import math
 from typing import List
 
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.geometry import LineString
-
-from pydantic import BaseModel, Field
 
 from cncpen import ImageSampler
 from cncpen import register_modification

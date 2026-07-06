@@ -1,5 +1,8 @@
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, model_validator
+
+from pydantic import BaseModel
+from pydantic import Field
+from pydantic import model_validator
 
 
 class StepConfig(BaseModel):
@@ -24,29 +27,32 @@ class StepConfig(BaseModel):
     def _route_params(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
-        
+
         known_fields = {
             'pattern', 'modification', 'use_previous_lines', 'polygonize',
-            'clip_local', 'replace_previous', 'overscan', 'simplify', 'angle', 'params'
+            'clip_local', 'replace_previous', 'overscan', 'simplify', 'angle',
+            'params'
         }
-        
+
         step_args = {}
         existing_params = data.get('params')
-        
-        if existing_params is not None and not isinstance(existing_params, dict):
+
+        if existing_params is not None and not isinstance(
+                existing_params, dict):
             step_args['params'] = existing_params
             for k, v in data.items():
                 if k in known_fields and k != 'params':
                     step_args[k] = v
             return step_args
-            
-        params_dict = existing_params if isinstance(existing_params, dict) else {}
+
+        params_dict = existing_params if isinstance(existing_params,
+                                                    dict) else {}
         for k, v in data.items():
             if k in known_fields:
                 step_args[k] = v
             else:
                 params_dict[k] = v
-                
+
         step_args['params'] = params_dict
         return step_args
 

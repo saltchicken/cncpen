@@ -3,9 +3,9 @@ import math
 from typing import Any, List
 
 import argcomplete
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.geometry import LineString
-
-from pydantic import BaseModel, Field
 
 from cncpen import register_modification
 from cncpen import RenderContext

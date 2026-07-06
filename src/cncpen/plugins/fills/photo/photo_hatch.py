@@ -2,10 +2,10 @@ import argparse
 from typing import Any, List
 
 import argcomplete
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
-
-from pydantic import BaseModel, Field
 
 from cncpen import ImageSampler
 from cncpen import register_fill

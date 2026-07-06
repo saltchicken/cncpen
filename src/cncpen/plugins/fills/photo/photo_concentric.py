@@ -3,12 +3,12 @@ from typing import Any, List
 
 import argcomplete
 import numpy as np
+from pydantic import BaseModel
+from pydantic import Field
 from scipy import ndimage
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from skimage import measure
-
-from pydantic import BaseModel, Field
 
 from cncpen import ImageSampler
 from cncpen import register_fill

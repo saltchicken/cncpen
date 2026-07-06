@@ -4,12 +4,12 @@ import random
 from typing import List
 
 import numpy as np
+from pydantic import BaseModel
+from pydantic import Field
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
-
-from pydantic import BaseModel, Field
 
 from cncpen import register_fill
 from cncpen import RenderContext
@@ -68,7 +68,8 @@ class VenationFill:
         attractors_np = np.array(attractors)
 
         # 2. Initialize the root node
-        root_x = params.root_x if params.root_x is not None else (minx + maxx) / 2.0
+        root_x = params.root_x if params.root_x is not None else (minx +
+                                                                  maxx) / 2.0
         root_y = params.root_y if params.root_y is not None else miny
         nodes = [[root_x, root_y]]
 

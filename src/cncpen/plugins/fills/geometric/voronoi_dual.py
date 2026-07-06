@@ -3,12 +3,12 @@ from typing import Any, List
 
 import argcomplete
 import numpy as np
+from pydantic import BaseModel
+from pydantic import Field
 from scipy.spatial import Delaunay
 from scipy.spatial import Voronoi
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
-
-from pydantic import BaseModel, Field
 
 from cncpen import register_fill
 from cncpen import RenderContext

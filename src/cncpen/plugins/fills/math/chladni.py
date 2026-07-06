@@ -3,11 +3,11 @@ import math
 from typing import Any, List
 
 import argcomplete
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
-
-from pydantic import BaseModel, Field
 
 from cncpen import register_fill
 from cncpen import RenderContext
