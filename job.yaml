@@ -1,5 +1,10 @@
 fills:
-  - pattern: sine
-    spacing: 3.0
-  - modification: simplify
-    threshold: 0.2
+  - pattern: grid
+    cell_size: 50.0
+  - pattern: concentric
+    use_previous_lines: true
+    polygonize: true
+    replace_previous: false
+    spacing: 10.0
+  # - modification: simplify
+  #   threshold: 0.2

@@ -16,19 +16,54 @@ class ConcentricFill:
         spacing = context.config.get('spacing', 2.0)
         ring_simplify = context.config.get('ring_simplify', 0.2)
 
-        current_geom = shape.buffer(-spacing).simplify(ring_simplify,
-                                                       preserve_topology=False)
+        # --- INWARD CONCENTRIC (Polygons) ---
+        if shape.geom_type in ('Polygon', 'MultiPolygon'):
+            current_geom = shape.buffer(-spacing).simplify(ring_simplify,
+                                                           preserve_topology=False)
 
-        while not current_geom.is_empty and current_geom.area > 0:
-            polygons = [current_geom
-                       ] if current_geom.geom_type == 'Polygon' else list(
-                           current_geom.geoms)
-            for p in polygons:
-                if p.exterior:
-                    lines.append(LineString(p.exterior.coords))
-                for interior in p.interiors:
-                    lines.append(LineString(interior.coords))
-            current_geom = current_geom.buffer(-spacing).simplify(
-                ring_simplify, preserve_topology=False)
+            while not current_geom.is_empty and current_geom.area > 0:
+                polygons = [current_geom
+                           ] if current_geom.geom_type == 'Polygon' else list(
+                               current_geom.geoms)
+                for p in polygons:
+                    if p.exterior:
+                        lines.append(LineString(p.exterior.coords))
+                    for interior in p.interiors:
+                        lines.append(LineString(interior.coords))
+                current_geom = current_geom.buffer(-spacing).simplify(
+                    ring_simplify, preserve_topology=False)
+
+        # --- OUTWARD CONCENTRIC (LineStrings & Other Geometries) ---
+        else:
+            max_dist = context.max_r
+            dist = spacing
+
+            # Optionally preserve the original line in the output
+            # Defaults to True so the base path isn't lost if the previous step cleared it
+            if context.config.get('include_base', True):
+                if shape.geom_type == 'LineString':
+                    lines.append(shape)
+                elif hasattr(shape, 'geoms'):
+                    lines.extend([g for g in shape.geoms if g.geom_type == 'LineString'])
+
+            while dist <= max_dist:
+                # Buffer outward to create a polygon, then trace its boundary
+                current_geom = shape.buffer(dist).simplify(ring_simplify,
+                                                           preserve_topology=False)
+                
+                if current_geom.is_empty:
+                    break
+
+                polygons = [current_geom
+                           ] if current_geom.geom_type == 'Polygon' else list(
+                               current_geom.geoms)
+                
+                for p in polygons:
+                    if p.exterior:
+                        lines.append(LineString(p.exterior.coords))
+                    for interior in p.interiors:
+                        lines.append(LineString(interior.coords))
+
+                dist += spacing
 
         return lines

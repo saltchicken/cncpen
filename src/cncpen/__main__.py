@@ -8,7 +8,8 @@ from functools import reduce
 from typing import List, Tuple
 
 from shapely import affinity
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, MultiLineString, GeometryCollection
+from shapely.ops import polygonize, unary_union
 
 from cncpen import FILL_REGISTRY
 from cncpen import MODIFICATION_REGISTRY
@@ -89,21 +90,65 @@ def process_fills(closed_polys: List[Polygon],
             filler = fill_class()
             angle = step_def.get('angle', 0.0)
 
-            working_poly = affinity.rotate(
+            # --- NEW PIPELINE LOGIC ---
+            if step_def.get('use_previous_lines', False):
+                if not active_lines:
+                    logger.warning("    -> 'use_previous_lines' specified, but no lines exist yet. Skipping.")
+                    continue
+                
+                # If we want to treat the resulting grid/cells as boundaries to fill inside of
+                if step_def.get('polygonize', True):
+                    # 1. Combine active lines with the boundary so edge cells close properly
+                    lines_to_node = active_lines.copy()
+                    if poly.boundary.geom_type == 'LineString':
+                        lines_to_node.append(poly.boundary)
+                    elif hasattr(poly.boundary, 'geoms'):
+                        lines_to_node.extend(list(poly.boundary.geoms))
+                        
+                    # 2. Unary union splits all crossing lines at their intersections (noding)
+                    noded_lines = unary_union(lines_to_node)
+                    
+                    # 3. Polygonize the fully noded web
+                    extracted_polys = list(polygonize(noded_lines))
+                    
+                    if extracted_polys:
+                        source_geom = GeometryCollection(extracted_polys)
+                        logger.info(f"    -> Polygonized previous lines into {len(extracted_polys)} closed regions.")
+                    else:
+                        logger.warning("    -> Could not find closed regions to polygonize, falling back to lines.")
+                        source_geom = MultiLineString(active_lines)
+                else:
+                    # Treat them purely as paths (triggers outward concentric)
+                    source_geom = MultiLineString(active_lines)
+                
+                if step_def.get('replace_previous', True):
+                    active_lines = []
+            else:
+                source_geom = poly
+
+            # Rotate the geometry being passed to the filler
+            working_geom = affinity.rotate(
+                source_geom, -angle, origin=centroid) if angle != 0.0 else source_geom
+                
+            # Always maintain the outer boundary for the context and clipping, 
+            # even if the filler is operating on a set of internal lines.
+            working_boundary = affinity.rotate(
                 poly, -angle, origin=centroid) if angle != 0.0 else poly
 
             context = RenderContext(config=step_config,
-                                    boundary=working_poly,
+                                    boundary=working_boundary,
                                     centroid=centroid,
                                     max_r=max_r)
 
             lines = []
-            polygons = [working_poly] if working_poly.geom_type == 'Polygon' else list(working_poly.geoms)
-            for p in polygons:
-                lines.extend(filler.generate(p, context))
+            
+            # Handle standard Polygons as well as LineStrings/MultiLineStrings
+            geoms = [working_geom] if working_geom.geom_type in ('Polygon', 'LineString', 'LinearRing') else list(working_geom.geoms)
+            for g in geoms:
+                lines.extend(filler.generate(g, context))
 
             lines = [line for line in lines if not line.is_empty]
-            lines = apply_clipping(lines, boundary=working_poly)
+            lines = apply_clipping(lines, boundary=working_boundary)
             lines = apply_transform(lines,
                                     angle=angle,
                                     origin=centroid,
