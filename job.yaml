@@ -1,9 +1,8 @@
 fills:
-  - pattern: photo-contour
-    image: images/loz.jpg
-    levels: 1
-    resolution: 0.05
+  - pattern: zigzag
 
   - modification: simplify
     tolerance: 0.2
     preserve_topology: false
+
+  - modification: optimize

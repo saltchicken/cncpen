@@ -18,7 +18,6 @@ from cncpen.dxf import extract_dxf_paths
 from cncpen.geometry import _ensure_geom
 from cncpen.geometry import apply_clipping
 from cncpen.geometry import apply_transform
-from cncpen.geometry import optimize_paths_nearest_neighbor
 from cncpen.pen import PenConfig
 from cncpen.pen import PenTool
 
@@ -156,13 +155,6 @@ def process_fills(closed_polys: List[Polygon],
     # Accumulate finalized coordinates
     all_raw_fill_coords.extend([list(line.coords) for line in active_lines])
 
-    # --- OPTIMIZE ALL LAYERS TOGETHER ---
-    if not global_config.get('no_optimize', False) and all_raw_fill_coords:
-        print(f"Optimizing {len(fill_definitions)} fill layer(s)...")
-        last_pos = (0.0, 0.0) if not paths_to_draw else paths_to_draw[-1][-1]
-        all_raw_fill_coords = optimize_paths_nearest_neighbor(
-            all_raw_fill_coords, start_pt=last_pos)
-
     # --- DRAW ---
     for f_pts in all_raw_fill_coords:
         pen.draw_path(f_pts, clearance=False)
@@ -191,10 +183,6 @@ def main() -> None:
     except DXFReadError as e:
         print(f"Fatal Error: {e}", file=sys.stderr)
         sys.exit(1)
-
-    if not config.get('no_optimize', False):
-        print("Optimizing outline paths...")
-        paths_to_draw = optimize_paths_nearest_neighbor(paths_to_draw)
 
     print(f"Extracted {len(paths_to_draw)} draw operations.")
 
