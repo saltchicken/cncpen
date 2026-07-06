@@ -2,7 +2,6 @@ from functools import reduce
 import logging
 import math
 import operator
-import time
 from typing import List, Optional, Tuple
 
 from shapely import affinity
@@ -197,7 +196,6 @@ def process_fills(closed_polys: List[Polygon], config: JobConfig) -> List[LineSt
     total_steps = len(config.fills)
 
     for step_idx, step_config in enumerate(config.fills, 1):
-        step_timer = time.perf_counter()
 
         if step_config.pattern:
             logger.info(f"  [{step_idx}/{total_steps}] Executing fill pattern '{step_config.pattern}'...")
@@ -214,7 +212,6 @@ def process_fills(closed_polys: List[Polygon], config: JobConfig) -> List[LineSt
         total_vertices = sum(len(line.coords) for line in active_lines)
         logger.info(
             f"    -> Resulting state: {len(active_lines)} lines ({total_vertices} vertices) "
-            f"in {time.perf_counter() - step_timer:.3f}s."
         )
 
     # Return the generated lines instead of drawing them here
