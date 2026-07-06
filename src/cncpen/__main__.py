@@ -1,3 +1,4 @@
+
 import logging
 import math
 import operator
@@ -70,16 +71,19 @@ def process_fills(closed_polys: List[Polygon],
 
     all_raw_fill_coords = []
     active_lines = []
+    total_steps = len(fill_definitions)
 
-    for step_def in fill_definitions:
+    for step_idx, step_def in enumerate(fill_definitions, 1):
         step_config = {**global_config, **step_def}
+        step_timer = time.perf_counter()
 
         if "pattern" in step_def:
             pattern_name = step_def.get("pattern")
+            logger.info(f"  [{step_idx}/{total_steps}] Executing fill pattern '{pattern_name}'...")
             fill_class = FILL_REGISTRY.get(pattern_name)
 
             if not fill_class:
-                logger.warning(f"Unknown fill pattern '{pattern_name}'")
+                logger.warning(f"    -> Unknown fill pattern '{pattern_name}'")
                 continue
 
             filler = fill_class()
@@ -106,13 +110,15 @@ def process_fills(closed_polys: List[Polygon],
                                     simplify_tol=step_def.get('simplify', 0.0))
 
             active_lines.extend(lines)
+            logger.info(f"    -> Generated {len(lines)} lines (Cumulative active lines: {len(active_lines)}) in {time.perf_counter() - step_timer:.3f}s.")
 
         elif "modification" in step_def:
             mod_name = step_def.get("modification")
+            logger.info(f"  [{step_idx}/{total_steps}] Applying modification '{mod_name}'...")
             mod_class = MODIFICATION_REGISTRY.get(mod_name)
 
             if not mod_class:
-                logger.warning(f"Unknown modification '{mod_name}'")
+                logger.warning(f"    -> Unknown modification '{mod_name}'")
                 continue
 
             mod = mod_class()
@@ -122,12 +128,16 @@ def process_fills(closed_polys: List[Polygon],
                                     centroid=centroid,
                                     max_r=max_r)
 
+            initial_line_count = len(active_lines)
             active_lines = mod.apply(active_lines, context)
             active_lines = apply_clipping(active_lines, boundary=poly)
+            
+            logger.info(f"    -> Modified {initial_line_count} lines into {len(active_lines)} lines in {time.perf_counter() - step_timer:.3f}s.")
 
         else:
-            logger.warning(f"Step must contain 'pattern' or 'modification'. Ignored: {step_def}")
+            logger.warning(f"  [{step_idx}/{total_steps}] Step must contain 'pattern' or 'modification'. Ignored: {step_def}")
 
+    logger.info("  Writing fill paths to G-code...")
     all_raw_fill_coords.extend([list(line.coords) for line in active_lines])
 
     for f_pts in all_raw_fill_coords:
