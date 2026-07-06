@@ -5,7 +5,8 @@ from typing import List
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill, RenderContext
+from cncpen import register_fill
+from cncpen import RenderContext
 
 
 @register_fill("flow_field")
@@ -45,7 +46,7 @@ class FlowFieldFill:
                 y += spacing
             x += spacing
 
-        # 2. Define the mathematical flow 
+        # 2. Define the mathematical flow
         cx, cy = shape.centroid.x, shape.centroid.y
 
         def get_field_angle(px: float, py: float) -> float:
@@ -66,17 +67,18 @@ class FlowFieldFill:
                 theta = get_field_angle(cx_pt, cy_pt)
                 nx_pt = cx_pt + step_length * math.cos(theta)
                 ny_pt = cy_pt + step_length * math.sin(theta)
-                
+
                 path.append((nx_pt, ny_pt))
                 cx_pt, cy_pt = nx_pt, ny_pt
-                
+
                 # Terminate early if the line wanders way outside the draw area
-                if not (minx - 10 <= cx_pt <= maxx + 10 and miny - 10 <= cy_pt <= maxy + 10):
+                if not (minx - 10 <= cx_pt <= maxx + 10 and
+                        miny - 10 <= cy_pt <= maxy + 10):
                     break
-                    
+
             if len(path) > 1:
                 lines.append(LineString(path))
 
-        # Note: We don't need to clip these lines to the polygon shape here; 
+        # Note: We don't need to clip these lines to the polygon shape here;
         # the main cncpen pipeline handles boundary clipping automatically.
         return lines

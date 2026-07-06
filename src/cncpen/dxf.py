@@ -41,7 +41,8 @@ def extract_dxf_paths(
                 if len(vertices) > 1:
                     raw_lines.append(LineString([(v.x, v.y) for v in vertices]))
             except Exception as e:
-                logger.warning(f"Could not process {entity.dxftype()} entity: {e}")
+                logger.warning(
+                    f"Could not process {entity.dxftype()} entity: {e}")
 
     if not raw_lines:
         return []

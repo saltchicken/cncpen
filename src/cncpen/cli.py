@@ -17,30 +17,38 @@ def parse_args() -> dict:
         description="Generate CNC G-code from a DXF file using a pen tool.")
 
     parser.add_argument("dxf_file", help="Path to the input DXF file")
-    
+
     # Create a group so the user must provide EITHER a config OR a preset
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-c", "--config", help="Path to a custom YAML job configuration file")
-    group.add_argument("-p", "--preset", help="Name of a built-in preset (e.g., 'contour')")
+    group.add_argument("-c",
+                       "--config",
+                       help="Path to a custom YAML job configuration file")
+    group.add_argument("-p",
+                       "--preset",
+                       help="Name of a built-in preset (e.g., 'contour')")
 
     args = parser.parse_args()
     job_config = {}
 
     # Logic to load either from the bundled presets or a local file
     if args.preset:
-        preset_filename = args.preset if args.preset.endswith('.yaml') else f"{args.preset}.yaml"
+        preset_filename = args.preset if args.preset.endswith(
+            '.yaml') else f"{args.preset}.yaml"
         try:
             # Access the bundled YAML file directly from the package
-            config_text = pkg_resources.files('cncpen.presets').joinpath(preset_filename).read_text()
+            config_text = pkg_resources.files('cncpen.presets').joinpath(
+                preset_filename).read_text()
             job_config = yaml.safe_load(config_text) or {}
         except FileNotFoundError:
             # Give a helpful error showing what presets actually exist
             available = [
-                f.name.replace('.yaml', '') 
-                for f in pkg_resources.files('cncpen.presets').iterdir() 
+                f.name.replace('.yaml', '')
+                for f in pkg_resources.files('cncpen.presets').iterdir()
                 if f.name.endswith('.yaml')
             ]
-            parser.error(f"Preset '{args.preset}' not found. Available presets: {', '.join(available)}")
+            parser.error(
+                f"Preset '{args.preset}' not found. Available presets: {', '.join(available)}"
+            )
         except Exception as e:
             parser.error(f"Failed to read preset YAML: {e}")
     else:

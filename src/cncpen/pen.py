@@ -1,10 +1,11 @@
-import logging
 from dataclasses import dataclass
+import logging
 from typing import List, Optional, Tuple
 
 from gscrib import GCodeBuilder
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class PenConfig:
@@ -39,7 +40,8 @@ class PenTool:
         if exc_type is None:
             try:
                 with open(self.output_filename, 'r') as f:
-                    logger.info(f"Total G-code lines produced: {sum(1 for _ in f)}")
+                    logger.info(
+                        f"Total G-code lines produced: {sum(1 for _ in f)}")
             except Exception as e:
                 logger.warning(f"Could not count lines in output file: {e}")
 
