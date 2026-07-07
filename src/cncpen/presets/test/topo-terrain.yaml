@@ -12,7 +12,6 @@ fills:
     
   # Add slight organic jitter to the lines
   - operation: roughen
-    variance: 0.25
     
   # Clean up the jitter to prevent the machine from stuttering
   - operation: simplify

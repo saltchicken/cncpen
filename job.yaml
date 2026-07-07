@@ -8,4 +8,4 @@ fills:
     replace_previous: false
     spacing: 10
   - operation: simplify
-    threshold: 0.2
+    tolerance: 0.2

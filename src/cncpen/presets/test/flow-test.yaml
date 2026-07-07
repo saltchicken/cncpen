@@ -5,6 +5,6 @@ fills:
   - operation: flow_field
 
   - operation: simplify
-    threshold: 0.2
+    tolerance: 0.2
 
   - operation: optimize

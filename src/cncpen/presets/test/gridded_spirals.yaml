@@ -8,5 +8,5 @@ fills:
     replace_previous: true
     spacing: 2.5
   - operation: simplify
-    threshold: 0.2
+    tolerance: 0.2
 
