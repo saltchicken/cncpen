@@ -11,7 +11,7 @@ from shapely.geometry.base import BaseGeometry
 from skimage import measure
 
 from cncpen import ImageSampler
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -23,12 +23,11 @@ class PhotoConcentricConfig(BaseModel):
     sampler: Any = None
 
 
-@register_fill("photo-concentric", config_class=PhotoConcentricConfig)
+@register_operation("photo-concentric", config_class=PhotoConcentricConfig)
 class PhotoConcentricFill:
     """Generates geometric concentric fills driven by image boundaries."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         sampler = params.sampler
         spacing = params.spacing
@@ -40,7 +39,7 @@ class PhotoConcentricFill:
             sampler = ImageSampler(image_path, context.bounds)
 
         if not sampler:
-            return []
+            return lines
 
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
@@ -69,7 +68,7 @@ class PhotoConcentricFill:
         pixel_spacing = spacing / resolution
         max_dist = np.max(distance_field)
 
-        lines = []
+        out_lines = []
 
         # 4. Generate contours stepping inward by the spacing amount
         current_dist = pixel_spacing
@@ -87,8 +86,8 @@ class PhotoConcentricFill:
                     coords.append((px, py))
 
                 if len(coords) >= 2:
-                    lines.append(LineString(coords))
+                    out_lines.append(LineString(coords))
 
             current_dist += pixel_spacing
 
-        return lines
+        return lines + out_lines

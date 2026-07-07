@@ -7,8 +7,7 @@ from pydantic import model_validator
 
 class StepConfig(BaseModel):
     """Configuration for an individual fill or modification step."""
-    pattern: Optional[str] = None
-    modification: Optional[str] = None
+    operation: Optional[str] = None
 
     # Core pipeline properties
     use_previous_lines: bool = False
@@ -29,6 +28,11 @@ class StepConfig(BaseModel):
             return data
 
         known_fields = set(cls.model_fields.keys())
+
+        if 'pattern' in data:
+            data['operation'] = data.pop('pattern')
+        if 'modification' in data:
+            data['operation'] = data.pop('modification')
 
         step_args = {}
         existing_params = data.get('params')

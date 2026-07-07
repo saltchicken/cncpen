@@ -9,7 +9,7 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
 from cncpen import ImageSampler
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -20,11 +20,10 @@ class PhotoWaveConfig(BaseModel):
     sampler: Any = None
 
 
-@register_fill("photo_wave", config_class=PhotoWaveConfig)
+@register_operation("photo_wave", config_class=PhotoWaveConfig)
 class PhotoWaveFill:
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         lines = params.lines
         amp = params.amp
@@ -35,7 +34,7 @@ class PhotoWaveFill:
             sampler = ImageSampler(image_path, context.bounds)
 
         if not sampler:
-            return []
+            return lines
 
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
@@ -58,4 +57,4 @@ class PhotoWaveFill:
 
             output_paths.append(LineString(coords))
 
-        return output_paths
+        return lines + output_paths

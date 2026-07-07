@@ -8,7 +8,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 PHI = (1.0 + math.sqrt(5.0)) / 2.0
@@ -18,15 +18,14 @@ class PenroseConfig(BaseModel):
     depth: int = Field(default=5, ge=1)
 
 
-@register_fill("penrose", config_class=PenroseConfig)
+@register_operation("penrose", config_class=PenroseConfig)
 class PenroseFill:
     """
     Generates an aperiodic Penrose P3 (rhombus-like) tiling pattern
     using recursive Robinson triangle deflation.
     """
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         depth = context.config.params.depth
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y
@@ -84,7 +83,7 @@ class PenroseFill:
 
         # Extract unique line segments to avoid drawing overlapping lines twice
         seen_edges = set()
-        lines = []
+        out_lines = []
 
         def get_edge_key(
             pt1: Tuple[float, float],
@@ -100,6 +99,6 @@ class PenroseFill:
                 key = get_edge_key(start, end)
                 if key not in seen_edges:
                     seen_edges.add(key)
-                    lines.append(LineString([start, end]))
+                    out_lines.append(LineString([start, end]))
 
-        return lines
+        return lines + out_lines

@@ -6,7 +6,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -18,11 +18,10 @@ class GuillocheConfig(BaseModel):
     resolution: float = Field(default=0.05, gt=0.0)
 
 
-@register_fill("guilloche", config_class=GuillocheConfig)
+@register_operation("guilloche", config_class=GuillocheConfig)
 class GuillocheFill:
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
 
         R = params.major_radius
@@ -59,5 +58,5 @@ class GuillocheFill:
                            p * math.sin(ratio * max_theta)))
 
         if len(points) > 1:
-            return [LineString(points)]
-        return []
+            return lines + [LineString(points)]
+        return lines

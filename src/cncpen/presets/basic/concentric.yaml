@@ -1,2 +1,2 @@
 fills:
-  - pattern: concentric
+  - operation: concentric

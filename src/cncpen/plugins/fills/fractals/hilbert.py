@@ -8,7 +8,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -16,12 +16,11 @@ class HilbertConfig(BaseModel):
     spacing: float = Field(default=2.0, gt=0.0)
 
 
-@register_fill("hilbert", config_class=HilbertConfig)
+@register_operation("hilbert", config_class=HilbertConfig)
 class HilbertFill:
     """Generates a highly intricate Hilbert space-filling curve."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         spacing = context.config.params.spacing
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
@@ -49,6 +48,6 @@ class HilbertFill:
 
         pts = hilbert(minx, miny, size, 0.0, 0.0, size, order)
         if len(pts) < 2:
-            return []
+            return lines
 
-        return [LineString(pts)]
+        return lines + [LineString(pts)]

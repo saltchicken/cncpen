@@ -8,7 +8,7 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
 from cncpen import ImageSampler
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -17,11 +17,10 @@ class PhotoHatchConfig(BaseModel):
     image: str | None = None
 
 
-@register_fill("photo_hatch", config_class=PhotoHatchConfig)
+@register_operation("photo_hatch", config_class=PhotoHatchConfig)
 class PhotoHatchFill:
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         cell_size = params.cell_size
         image_path = params.image
@@ -29,7 +28,7 @@ class PhotoHatchFill:
         # 2. Check for the image path directly
         if not image_path:
             print("Warning: --image argument is required for photo_hatch.")
-            return []
+            return lines
 
         # 3. Initialize the sampler using the global context bounds
         sampler = ImageSampler(image_path, context.bounds)
@@ -54,4 +53,4 @@ class PhotoHatchFill:
                 y += cell_size
             x += cell_size
 
-        return output_paths
+        return lines + output_paths

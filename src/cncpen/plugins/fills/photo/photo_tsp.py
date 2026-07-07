@@ -10,7 +10,7 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
 from cncpen import ImageSampler
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -20,11 +20,10 @@ class PhotoTSPConfig(BaseModel):
     sampler: Any = None
 
 
-@register_fill("photo_tsp", config_class=PhotoTSPConfig)
+@register_operation("photo_tsp", config_class=PhotoTSPConfig)
 class PhotoTSPFill:
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         nodes = params.nodes
         sampler = params.sampler
@@ -34,7 +33,7 @@ class PhotoTSPFill:
             sampler = ImageSampler(image_path, context.bounds)
 
         if not sampler:
-            return []
+            return lines
 
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
@@ -51,7 +50,7 @@ class PhotoTSPFill:
                 points.append((actual_x, actual_y))
 
         if not points:
-            return []
+            return lines
 
         # 2. Greedy Nearest Neighbor TSP
         current = points.pop(0)
@@ -70,4 +69,4 @@ class PhotoTSPFill:
             current = points.pop(best_idx)
             route.append(current)
 
-        return [LineString(route)]
+        return lines + [LineString(route)]

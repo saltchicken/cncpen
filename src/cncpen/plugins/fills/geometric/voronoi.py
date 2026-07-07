@@ -10,7 +10,7 @@ from shapely.geometry import MultiPoint
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import voronoi_diagram
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -19,12 +19,11 @@ class VoronoiConfig(BaseModel):
     sampler: Any = None
 
 
-@register_fill("voronoi", config_class=VoronoiConfig)
+@register_operation("voronoi", config_class=VoronoiConfig)
 class VoronoiFill:
     """Generates a Voronoi diagram fill based on random or image-weighted sites."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         sites = params.sites
         sampler = params.sampler
@@ -33,7 +32,7 @@ class VoronoiFill:
         height = maxy - miny
 
         if width == 0 or height == 0 or sites < 2:
-            return []
+            return lines
 
         points = []
         attempts = 0
@@ -53,7 +52,7 @@ class VoronoiFill:
             points.append((actual_x, actual_y))
 
         if len(points) < 2:
-            return []
+            return lines
 
         # 2. Compute the Voronoi diagram
         multipoint = MultiPoint(points)
@@ -65,16 +64,16 @@ class VoronoiFill:
                                   edges=True)
 
         # 3. Extract the raw lines
-        lines = []
+        out_lines = []
         if diagram.geom_type == 'LineString':
-            lines.append(diagram)
+            out_lines.append(diagram)
         elif diagram.geom_type == 'MultiLineString':
-            lines.extend(list(diagram.geoms))
+            out_lines.extend(list(diagram.geoms))
         elif diagram.geom_type == 'GeometryCollection':
             for geom in diagram.geoms:
                 if geom.geom_type == 'LineString':
-                    lines.append(geom)
+                    out_lines.append(geom)
                 elif geom.geom_type == 'MultiLineString':
-                    lines.extend(list(geom.geoms))
+                    out_lines.extend(list(geom.geoms))
 
-        return lines
+        return lines + out_lines

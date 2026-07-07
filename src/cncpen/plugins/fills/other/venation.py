@@ -11,7 +11,7 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 logger = logging.getLogger(__name__)
@@ -28,11 +28,10 @@ class VenationConfig(BaseModel):
     max_iterations: int = Field(default=5000, gt=0)
 
 
-@register_fill("venation", config_class=VenationConfig)
+@register_operation("venation", config_class=VenationConfig)
 class VenationFill:
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         seed = params.seed
         density = params.density
@@ -62,7 +61,7 @@ class VenationFill:
             tries += 1
 
         if not attractors:
-            return []
+            return lines
 
         # Convert attractors to a numpy array for high-speed spatial querying
         attractors_np = np.array(attractors)
@@ -73,7 +72,7 @@ class VenationFill:
         root_y = params.root_y if params.root_y is not None else miny
         nodes = [[root_x, root_y]]
 
-        lines = []
+        out_lines = []
         active = True
 
         # SAFETY 3: Circuit breaker to prevent terminal lockups
@@ -131,7 +130,7 @@ class VenationFill:
                     new_y = ny + dir_y * segment_length
 
                     new_nodes.append([new_x, new_y])
-                    lines.append(LineString([(nx, ny), (new_x, new_y)]))
+                    out_lines.append(LineString([(nx, ny), (new_x, new_y)]))
                     active = True
 
             # Add newly grown tips to the active node list
@@ -143,4 +142,4 @@ class VenationFill:
                 f"Venation generator hit max_iterations ({max_iterations}). Terminated early to prevent lockup. Try increasing max_iterations or tweaking spacing."
             )
 
-        return lines
+        return lines + out_lines

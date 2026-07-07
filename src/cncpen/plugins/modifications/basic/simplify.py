@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from pydantic import Field
 from shapely.geometry import LineString
 
-from cncpen import register_modification
+from cncpen import register_operation
+from shapely.geometry.base import BaseGeometry
 from cncpen import RenderContext
 
 
@@ -13,11 +14,10 @@ class SimplifyConfig(BaseModel):
     preserve_topology: bool = Field(default=False)
 
 
-@register_modification("simplify", config_class=SimplifyConfig)
+@register_operation("simplify", config_class=SimplifyConfig)
 class SimplifyMod:
 
-    def apply(self, lines: List[LineString],
-              context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
 
         tolerance = params.tolerance

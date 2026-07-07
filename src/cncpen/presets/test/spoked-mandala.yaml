@@ -3,26 +3,26 @@ globals:
 
 fills:
   # Core radial geometry
-  - pattern: sacred
+  - operation: sacred
     type: seed_of_life
     spacing: 50
 
   # Continuous sweeping paths 
-  - pattern: spiral
+  - operation: spiral
     pitch: 20.0
     angle: 70.0
     spacing: 10
     resolution: 0.1
 
   # Warp the center outward
-  - modification: fisheye
+  - operation: fisheye
     strength: 1.5
     center_x: 0.0
     center_y: 0.0
     
 
-  - modification: simplify
+  - operation: simplify
     tolerance: 0.5
     preserve_topology: false
 
-  - modification: optimize
+  - operation: optimize

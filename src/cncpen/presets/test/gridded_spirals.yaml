@@ -1,12 +1,12 @@
 fills:
-  - pattern: grid
+  - operation: grid
     cell_size: 50.0
-  - pattern: spiral
+  - operation: spiral
     use_previous_lines: true
     polygonize: true
     clip_local: false
     replace_previous: true
     spacing: 2.5
-  - modification: simplify
+  - operation: simplify
     threshold: 0.2
 

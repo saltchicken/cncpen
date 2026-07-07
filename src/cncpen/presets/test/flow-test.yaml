@@ -2,9 +2,9 @@ globals:
   outline_simplify: 0.1
 
 fills:
-  - pattern: flow_field
+  - operation: flow_field
 
-  - modification: simplify
+  - operation: simplify
     threshold: 0.2
 
-  - modification: optimize
+  - operation: optimize

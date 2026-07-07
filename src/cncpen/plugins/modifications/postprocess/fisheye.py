@@ -7,7 +7,8 @@ from pydantic import BaseModel
 from pydantic import Field
 from shapely.geometry import LineString
 
-from cncpen import register_modification
+from cncpen import register_operation
+from shapely.geometry.base import BaseGeometry
 from cncpen import RenderContext
 
 
@@ -15,11 +16,10 @@ class FisheyeConfig(BaseModel):
     fisheye: float = Field(default=0.0)
 
 
-@register_modification("fisheye", config_class=FisheyeConfig)
+@register_operation("fisheye", config_class=FisheyeConfig)
 class FisheyeMod:
 
-    def apply(self, lines: List[LineString],
-              context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         fisheye = context.config.params.fisheye
         if not fisheye or context.max_r <= 0:
             return lines

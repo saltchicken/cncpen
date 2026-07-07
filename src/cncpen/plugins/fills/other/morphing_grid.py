@@ -8,7 +8,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -19,15 +19,14 @@ class MorphingGridConfig(BaseModel):
     sampler: Any = None
 
 
-@register_fill("morphing_grid", config_class=MorphingGridConfig)
+@register_operation("morphing_grid", config_class=MorphingGridConfig)
 class MorphingGridFill:
     """
     Generates a grid of geometric shapes. Morphs in complexity, scale, and rotation 
     based EITHER on an underlying photo sampler OR a mathematical waveform progression.
     """
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         spacing = params.spacing
         cell_size = params.cell_size
@@ -39,10 +38,10 @@ class MorphingGridFill:
         height = maxy - miny
 
         if width == 0 or height == 0:
-            return []
+            return lines
 
         step = max(spacing, cell_size)
-        lines = []
+        out_lines = []
 
         y = miny + (step / 2)
         while y <= maxy:
@@ -71,8 +70,8 @@ class MorphingGridFill:
                     py = y + radius * math.sin(theta)
                     coords.append((px, py))
 
-                lines.append(LineString(coords))
+                out_lines.append(LineString(coords))
                 x += step
             y += step
 
-        return lines
+        return lines + out_lines

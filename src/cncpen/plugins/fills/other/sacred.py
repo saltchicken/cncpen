@@ -9,7 +9,7 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -18,12 +18,11 @@ class SacredConfig(BaseModel):
     type: str = Field(default="seed_of_life")
 
 
-@register_fill("sacred", config_class=SacredConfig)
+@register_operation("sacred", config_class=SacredConfig)
 class SacredFill:
     """Generates a Flower of Life (overlapping circles) sacred geometry fill."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         radius = max(context.config.params.spacing, 0.1)
         minx, miny, maxx, maxy = shape.bounds
         dx = radius
@@ -49,4 +48,4 @@ class SacredFill:
             y += dy
             row += 1
 
-        return circles
+        return lines + circles

@@ -7,7 +7,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -19,15 +19,14 @@ class FlowFieldConfig(BaseModel):
     seed: int = Field(default=42)
 
 
-@register_fill("flow_field", config_class=FlowFieldConfig)
+@register_operation("flow_field", config_class=FlowFieldConfig)
 class FlowFieldFill:
     """
     Generates organic, sweeping curves by dropping 'seeds' and tracing 
     their paths through a mathematical vector field.
     """
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         spacing = params.spacing
         step_length = params.step_length
@@ -41,7 +40,7 @@ class FlowFieldFill:
         height = maxy - miny
 
         if width <= 0 or height <= 0:
-            return []
+            return lines
 
         # 1. Distribute starting seeds across the bounding box
         seeds = []
@@ -68,7 +67,7 @@ class FlowFieldFill:
             return angle * math.pi
 
         # 3. Trace the paths through the field
-        lines = []
+        out_lines = []
         for sx, sy in seeds:
             path = [(sx, sy)]
             cx_pt, cy_pt = sx, sy
@@ -87,8 +86,8 @@ class FlowFieldFill:
                     break
 
             if len(path) > 1:
-                lines.append(LineString(path))
+                out_lines.append(LineString(path))
 
         # Note: We don't need to clip these lines to the polygon shape here;
         # the main cncpen pipeline handles boundary clipping automatically.
-        return lines
+        return lines + out_lines

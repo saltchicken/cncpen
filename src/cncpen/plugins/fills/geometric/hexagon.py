@@ -8,7 +8,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -16,17 +16,16 @@ class HexagonConfig(BaseModel):
     radius: float = Field(default=3.0, gt=0.0)
 
 
-@register_fill("hexagon", config_class=HexagonConfig)
+@register_operation("hexagon", config_class=HexagonConfig)
 class HexagonFill:
     """Generates a regular hexagonal (honeycomb) tessellation using a heuristic-driven graph traversal to minimize pen lifts."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         radius = context.config.params.radius
         minx, miny, maxx, maxy = shape.bounds
 
         if radius <= 0:
-            return []
+            return lines
 
         w = math.sqrt(3.0) * radius
         h = 2.0 * radius
@@ -128,4 +127,4 @@ class HexagonFill:
                 float_path = [pts_map[node] for node in path]
                 continuous_lines.append(LineString(float_path))
 
-        return continuous_lines
+        return lines + continuous_lines

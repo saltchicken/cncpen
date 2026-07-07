@@ -8,7 +8,8 @@ from pydantic import BaseModel
 from pydantic import Field
 from shapely.geometry import LineString
 
-from cncpen import register_modification
+from cncpen import register_operation
+from shapely.geometry.base import BaseGeometry
 from cncpen import RenderContext
 
 
@@ -17,11 +18,10 @@ class RoughenConfig(BaseModel):
     roughen_amp: float = Field(default=0.0, ge=0.0)
 
 
-@register_modification("roughen", config_class=RoughenConfig)
+@register_operation("roughen", config_class=RoughenConfig)
 class RoughenMod:
 
-    def apply(self, lines: List[LineString],
-              context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         step = params.roughen_step
         amp = params.roughen_amp

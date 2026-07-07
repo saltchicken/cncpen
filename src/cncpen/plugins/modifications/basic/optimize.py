@@ -6,7 +6,8 @@ from pydantic import Field
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
 
-from cncpen import register_modification
+from cncpen import register_operation
+from shapely.geometry.base import BaseGeometry
 from cncpen import RenderContext
 
 
@@ -89,11 +90,10 @@ def optimize_paths_nearest_neighbor(
     return optimized
 
 
-@register_modification("optimize", config_class=OptimizeConfig)
+@register_operation("optimize", config_class=OptimizeConfig)
 class OptimizeMod:
 
-    def apply(self, lines: List[LineString],
-              context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         if not lines:
             return []
 

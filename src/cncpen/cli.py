@@ -5,8 +5,7 @@ import os
 import argcomplete
 import yaml
 
-from cncpen import FILL_REGISTRY
-from cncpen import MODIFICATION_REGISTRY
+from cncpen import OPERATION_REGISTRY
 from cncpen.config import JobConfig
 from cncpen.config import StepConfig
 from cncpen.plugins import load_plugins
@@ -102,15 +101,10 @@ def parse_args() -> JobConfig:
     for step in job_config_raw.get('fills', []):
         merged_dict = {**raw_globals, **step}
 
-        pattern = merged_dict.get('pattern')
-        modification = merged_dict.get('modification')
+        operation = merged_dict.get('operation') or merged_dict.get('pattern') or merged_dict.get('modification')
 
-        if pattern and pattern in FILL_REGISTRY:
-            config_cls = FILL_REGISTRY[pattern].get('config')
-            if config_cls:
-                merged_dict['params'] = config_cls(**merged_dict)
-        elif modification and modification in MODIFICATION_REGISTRY:
-            config_cls = MODIFICATION_REGISTRY[modification].get('config')
+        if operation and operation in OPERATION_REGISTRY:
+            config_cls = OPERATION_REGISTRY[operation].get('config')
             if config_cls:
                 merged_dict['params'] = config_cls(**merged_dict)
 

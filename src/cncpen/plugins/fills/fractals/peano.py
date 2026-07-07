@@ -8,7 +8,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -16,12 +16,11 @@ class PeanoConfig(BaseModel):
     spacing: float = Field(default=2.0, gt=0.0)
 
 
-@register_fill("peano", config_class=PeanoConfig)
+@register_operation("peano", config_class=PeanoConfig)
 class PeanoFill:
     """Generates a mathematically exact, continuous base-3 Peano space-filling curve."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         spacing = context.config.params.spacing
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
@@ -88,6 +87,6 @@ class PeanoFill:
             pts.append((px, py))
 
         if len(pts) < 2:
-            return []
+            return lines
 
-        return [LineString(pts)]
+        return lines + [LineString(pts)]

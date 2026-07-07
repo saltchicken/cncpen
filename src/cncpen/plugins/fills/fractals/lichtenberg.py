@@ -10,7 +10,7 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -19,15 +19,14 @@ class LichtenbergConfig(BaseModel):
     nodes: int = Field(default=1500, gt=0)
 
 
-@register_fill("lichtenberg", config_class=LichtenbergConfig)
+@register_operation("lichtenberg", config_class=LichtenbergConfig)
 class LichtenbergFill:
     """
     Generates a Lichtenberg-style (branching fractal) fill using an RRT
     (Rapidly-exploring Random Tree) algorithm confined to the polygon.
     """
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         spacing = params.spacing
         nodes = params.nodes
@@ -87,4 +86,4 @@ class LichtenbergFill:
             return branch_paths
 
         raw_paths = build_paths(0)
-        return [LineString(p) for p in raw_paths if len(p) > 1]
+        return lines + [LineString(p) for p in raw_paths if len(p) > 1]

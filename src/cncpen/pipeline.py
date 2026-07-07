@@ -14,8 +14,7 @@ from shapely.geometry.base import BaseGeometry
 from shapely.ops import polygonize
 from shapely.ops import unary_union
 
-from cncpen import FILL_REGISTRY
-from cncpen import MODIFICATION_REGISTRY
+from cncpen import OPERATION_REGISTRY
 from cncpen import RenderContext
 from cncpen.config import JobConfig
 from cncpen.config import StepConfig
@@ -98,19 +97,19 @@ def _prepare_source_geometry(
     return source_geom, remaining_lines
 
 
-def _apply_pattern(step_config: StepConfig, active_lines: List[LineString],
-                   poly: Polygon, centroid: Point,
-                   max_r: float) -> List[LineString]:
+def _apply_operation(step_config: StepConfig, active_lines: List[LineString],
+                     poly: Polygon, centroid: Point,
+                     max_r: float) -> List[LineString]:
     """Handles geometry extraction, rendering context setup, and pattern generation."""
-    registry_entry = FILL_REGISTRY.get(step_config.pattern)
+    registry_entry = OPERATION_REGISTRY.get(step_config.operation)
 
     if not registry_entry:
-        logger.warning(f"    -> Unknown fill pattern '{step_config.pattern}'")
+        logger.warning(f"    -> Unknown operation '{step_config.operation}'")
         return active_lines
 
-    filler = registry_entry["class"]()
+    plugin = registry_entry["class"]()
 
-    source_geom, new_active_lines = _prepare_source_geometry(
+    source_geom, remaining_lines = _prepare_source_geometry(
         step_config, active_lines, poly)
 
     # Setup Rotations and Context Boundaries
@@ -129,53 +128,43 @@ def _apply_pattern(step_config: StepConfig, active_lines: List[LineString],
                             centroid=centroid,
                             max_r=max_r + step_config.overscan)
 
-    lines = []
+    # Extract geometries to handle both single shapes and polygonized collections
     geoms = [working_geom] if working_geom.geom_type in (
-        'Polygon', 'LineString', 'LinearRing') else list(working_geom.geoms)
+        'Polygon', 'LineString', 'LinearRing') else list(getattr(working_geom, 'geoms', [working_geom]))
 
-    # Generate geometries
-    for g in geoms:
-        gen_shape = g.buffer(step_config.overscan) if (
-            step_config.overscan > 0 and g.geom_type == 'Polygon') else g
-        step_lines = filler.generate(gen_shape, context)
+    if len(geoms) == 1:
+        gen_shape = geoms[0].buffer(step_config.overscan) if (
+            step_config.overscan > 0 and geoms[0].geom_type in ('Polygon', 'MultiPolygon')) else geoms[0]
+        
+        result_lines = plugin.process(remaining_lines, gen_shape, context)
 
-        if step_config.clip_local and g.geom_type == 'Polygon':
-            step_lines = apply_clipping(step_lines, boundary=gen_shape)
+        if step_config.clip_local and gen_shape.geom_type in ('Polygon', 'MultiPolygon'):
+            result_lines = apply_clipping(result_lines, boundary=gen_shape)
+    else:
+        # For decomposed collections (from polygonize), iterate to generate fills locally
+        result_lines = remaining_lines.copy()
+        for g in geoms:
+            gen_shape = g.buffer(step_config.overscan) if (
+                step_config.overscan > 0 and g.geom_type in ('Polygon', 'MultiPolygon')) else g
+            
+            # Pass empty lines to isolate the generation for this specific sub-geometry
+            step_lines = plugin.process([], gen_shape, context)
+            
+            if step_config.clip_local and gen_shape.geom_type in ('Polygon', 'MultiPolygon'):
+                step_lines = apply_clipping(step_lines, boundary=gen_shape)
+                
+            result_lines.extend(step_lines)
 
-        lines.extend(step_lines)
-
-    lines = [line for line in lines if not line.is_empty]
+    result_lines = [line for line in result_lines if not line.is_empty]
 
     # Final clipping and transformation back to world space
-    lines = apply_clipping(lines, boundary=context_working_boundary)
-    lines = apply_transform(lines,
-                            angle=step_config.angle,
-                            origin=centroid,
-                            simplify_tol=step_config.simplify)
+    result_lines = apply_clipping(result_lines, boundary=context_working_boundary)
+    result_lines = apply_transform(result_lines,
+                                   angle=step_config.angle,
+                                   origin=centroid,
+                                   simplify_tol=step_config.simplify)
 
-    new_active_lines.extend(lines)
-    return new_active_lines
-
-
-def _apply_modification(step_config: StepConfig, active_lines: List[LineString],
-                        poly: Polygon, centroid: Point,
-                        max_r: float) -> List[LineString]:
-    """Applies a post-processing modification to the current active lines."""
-    registry_entry = MODIFICATION_REGISTRY.get(step_config.modification)
-
-    if not registry_entry:
-        logger.warning(
-            f"    -> Unknown modification '{step_config.modification}'")
-        return active_lines
-
-    mod = registry_entry["class"]()
-    context = RenderContext(config=step_config,
-                            boundary=poly,
-                            centroid=centroid,
-                            max_r=max_r)
-
-    active_lines = mod.apply(active_lines, context)
-    return apply_clipping(active_lines, boundary=poly)
+    return result_lines
 
 
 def process_fills(closed_polys: List[Polygon], config: JobConfig) -> List[LineString]:
@@ -197,16 +186,12 @@ def process_fills(closed_polys: List[Polygon], config: JobConfig) -> List[LineSt
 
     for step_idx, step_config in enumerate(config.fills, 1):
 
-        if step_config.pattern:
-            logger.info(f"  [{step_idx}/{total_steps}] Executing fill pattern '{step_config.pattern}'...")
-            active_lines = _apply_pattern(step_config, active_lines, poly, centroid, max_r)
-
-        elif step_config.modification:
-            logger.info(f"  [{step_idx}/{total_steps}] Applying modification '{step_config.modification}'...")
-            active_lines = _apply_modification(step_config, active_lines, poly, centroid, max_r)
+        if step_config.operation:
+            logger.info(f"  [{step_idx}/{total_steps}] Executing operation '{step_config.operation}'...")
+            active_lines = _apply_operation(step_config, active_lines, poly, centroid, max_r)
 
         else:
-            logger.warning(f"  [{step_idx}/{total_steps}] Step must contain 'pattern' or 'modification'. Ignored.")
+            logger.warning(f"  [{step_idx}/{total_steps}] Step must contain 'operation'. Ignored.")
             continue
 
         total_vertices = sum(len(line.coords) for line in active_lines)

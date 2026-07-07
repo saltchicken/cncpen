@@ -5,7 +5,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -15,12 +15,11 @@ class ConcentricConfig(BaseModel):
     include_base: bool = Field(default=True)
 
 
-@register_fill("concentric", config_class=ConcentricConfig)
+@register_operation("concentric", config_class=ConcentricConfig)
 class ConcentricFill:
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
-        lines = []
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
+        out_lines = []
         params = context.config.params
         spacing = params.spacing
         ring_simplify = params.ring_simplify
@@ -36,9 +35,9 @@ class ConcentricFill:
                                current_geom.geoms)
                 for p in polygons:
                     if p.exterior:
-                        lines.append(LineString(p.exterior.coords))
+                        out_lines.append(LineString(p.exterior.coords))
                     for interior in p.interiors:
-                        lines.append(LineString(interior.coords))
+                        out_lines.append(LineString(interior.coords))
                 current_geom = current_geom.buffer(-spacing).simplify(
                     ring_simplify, preserve_topology=False)
 
@@ -49,9 +48,9 @@ class ConcentricFill:
 
             if params.include_base:
                 if shape.geom_type == 'LineString':
-                    lines.append(shape)
+                    out_lines.append(shape)
                 elif hasattr(shape, 'geoms'):
-                    lines.extend(
+                    out_lines.extend(
                         [g for g in shape.geoms if g.geom_type == 'LineString'])
 
             while dist <= max_dist:
@@ -67,10 +66,10 @@ class ConcentricFill:
 
                 for p in polygons:
                     if p.exterior:
-                        lines.append(LineString(p.exterior.coords))
+                        out_lines.append(LineString(p.exterior.coords))
                     for interior in p.interiors:
-                        lines.append(LineString(interior.coords))
+                        out_lines.append(LineString(interior.coords))
 
                 dist += spacing
 
-        return lines
+        return lines + out_lines

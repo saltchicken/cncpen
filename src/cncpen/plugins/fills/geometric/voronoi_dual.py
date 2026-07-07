@@ -10,7 +10,7 @@ from scipy.spatial import Voronoi
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -21,24 +21,23 @@ class VoronoiDualConfig(BaseModel):
     mode: str = Field(default='dual')
 
 
-@register_fill("voronoi-dual", config_class=VoronoiDualConfig)
+@register_operation("voronoi-dual", config_class=VoronoiDualConfig)
 class VoronoiDualFill:
     """Generates Voronoi cells, Delaunay triangulations, or both overlaid."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         spacing = params.spacing
         num_points = params.num_points
         seed = params.seed
         mode = params.mode
-        lines = []
+        out_lines = []
         minx, miny, maxx, maxy = shape.bounds
         width = maxx - minx
         height = maxy - miny
 
         if width <= 0 or height <= 0:
-            return []
+            return lines
 
         if num_points <= 0:
             area = width * height
@@ -57,7 +56,7 @@ class VoronoiDualFill:
 
         # Both diagrams require a minimum of 4 distinct points
         if len(points) < 4:
-            return []
+            return lines
 
         # 1. Generate Voronoi Edges
         if mode in ["voronoi", "dual"]:
@@ -66,7 +65,7 @@ class VoronoiDualFill:
                 if -1 not in ridge:  # -1 represents a ridge stretching to infinity
                     p1 = vor.vertices[ridge[0]]
                     p2 = vor.vertices[ridge[1]]
-                    lines.append(LineString([p1, p2]))
+                    out_lines.append(LineString([p1, p2]))
 
         # 2. Generate Delaunay Triangulation Edges
         if mode in ["delaunay", "dual"]:
@@ -84,6 +83,6 @@ class VoronoiDualFill:
             for edge in delaunay_edges:
                 p1 = points[edge[0]]
                 p2 = points[edge[1]]
-                lines.append(LineString([p1, p2]))
+                out_lines.append(LineString([p1, p2]))
 
-        return lines
+        return lines + out_lines

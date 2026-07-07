@@ -4,19 +4,19 @@ globals:
 
 fills:
   # Modulate path height based on image darkness
-  - pattern: photo_wave
+  - operation: photo_wave
     image: images/loz.jpg
     amplitude: 4.0
     frequency: 0.15
     spacing: 2.0
     
   # Add slight organic jitter to the lines
-  - modification: roughen
+  - operation: roughen
     variance: 0.25
     
   # Clean up the jitter to prevent the machine from stuttering
-  - modification: simplify
+  - operation: simplify
     tolerance: 0.15
     preserve_topology: false
     
-  - modification: optimize
+  - operation: optimize

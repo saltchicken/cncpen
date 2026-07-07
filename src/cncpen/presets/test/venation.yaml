@@ -2,16 +2,16 @@ globals:
   outline_simplify: 0.1
 
 fills:
-  - pattern: venation
+  - operation: venation
     density: 1200              # How crowded the veins get
     segment_length: 5.0       # How far each branch steps per tick
     attraction_distance: 25.0 # How far a vein can "see" an attractor
     kill_distance: 3.5        # How close a vein gets before eating the attractor
 
   # Smooths out jagged stepped growth
-  - modification: simplify
+  - operation: simplify
     tolerance: 2.0
     preserve_topology: false
 
   # Critical for Space Colonization to prevent agonizing travel times
-  # - modification: optimize
+  # - operation: optimize

@@ -8,7 +8,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -17,12 +17,11 @@ class SpiralConfig(BaseModel):
     resolution: float = Field(default=0.5, gt=0.0)
 
 
-@register_fill("spiral", config_class=SpiralConfig)
+@register_operation("spiral", config_class=SpiralConfig)
 class SpiralFill:
     """Generates an Archimedean spiral outward from the shape's centroid."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         spacing = params.spacing
         resolution = params.resolution
@@ -41,7 +40,7 @@ class SpiralFill:
         max_r = max(math.hypot(x - cx, y - cy) for x, y in corners)
 
         if max_r == 0:
-            return []
+            return lines
 
         # 3. Setup spiral parameters
         b = spacing / (2.0 * math.pi)
@@ -70,6 +69,6 @@ class SpiralFill:
 
         # A LineString requires at least 2 points
         if len(points) < 2:
-            return []
+            return lines
 
-        return [LineString(points)]
+        return lines + [LineString(points)]

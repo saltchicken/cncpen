@@ -9,23 +9,13 @@ from shapely.geometry.base import BaseGeometry
 
 from cncpen.config import StepConfig
 
-FILL_REGISTRY = {}
-MODIFICATION_REGISTRY = {}
+OPERATION_REGISTRY = {}
 
 
-def register_fill(name, config_class=None):
-
-    def decorator(cls):
-        FILL_REGISTRY[name] = {"class": cls, "config": config_class}
-        return cls
-
-    return decorator
-
-
-def register_modification(name, config_class=None):
+def register_operation(name, config_class=None):
 
     def decorator(cls):
-        MODIFICATION_REGISTRY[name] = {"class": cls, "config": config_class}
+        OPERATION_REGISTRY[name] = {"class": cls, "config": config_class}
         return cls
 
     return decorator
@@ -67,15 +57,7 @@ class RenderContext:
         return self.boundary.bounds
 
 
-class FillPattern(Protocol):
+class PipelineOperation(Protocol):
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
-        ...
-
-
-class PathModification(Protocol):
-
-    def apply(self, lines: List[LineString],
-              context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         ...

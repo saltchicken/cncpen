@@ -9,7 +9,7 @@ from shapely import affinity
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -20,15 +20,14 @@ class ChaoticConfig(BaseModel):
     chaos_amp: float = Field(default=0.8)
 
 
-@register_fill("chaotic", config_class=ChaoticConfig)
+@register_operation("chaotic", config_class=ChaoticConfig)
 class ChaoticFill:
     """
     Generates a highly irregular, fractal-like fill using a base motif that
     is recursively morphed using spatially-driven affine transformations.
     """
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         spacing = params.spacing
         depth = params.depth
@@ -112,4 +111,4 @@ class ChaoticFill:
                 segment_fractal = segment_fractal[1:]
             fractal_coords.extend(segment_fractal)
 
-        return [LineString(fractal_coords)]
+        return lines + [LineString(fractal_coords)]

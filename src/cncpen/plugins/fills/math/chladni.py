@@ -9,7 +9,7 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -22,15 +22,14 @@ class ChladniConfig(BaseModel):
     sampler: Any = None
 
 
-@register_fill("chladni", config_class=ChladniConfig)
+@register_operation("chladni", config_class=ChladniConfig)
 class ChladniFill:
     """
     Generates Chladni resonant plate patterns using a marching squares algorithm.
     If an image sampler is provided, it warps the resonant nodes based on the photo's darkness.
     """
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         n = params.n
         m = params.m
@@ -44,7 +43,7 @@ class ChladniFill:
         height = maxy - miny
 
         if width <= 0 or height <= 0:
-            return []
+            return lines
 
         grid_res = max(res, 0.1)
 
@@ -117,7 +116,7 @@ class ChladniFill:
                         segments.append(LineString([pts[2], pts[3]]))
 
         if not segments:
-            return []
+            return lines
 
         # CNC Optimization: Stitch all the tiny disconnected grid segments
         # into continuous flowing linestrings to eliminate constant pen up/down commands.
@@ -132,4 +131,4 @@ class ChladniFill:
         elif merged.geom_type == 'MultiLineString':
             continuous_lines.extend(list(merged.geoms))
 
-        return continuous_lines
+        return lines + continuous_lines

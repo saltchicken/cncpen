@@ -9,7 +9,7 @@ from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -19,7 +19,7 @@ class ZentangleConfig(BaseModel):
     sampler: Any = None
 
 
-@register_fill("zentangle", config_class=ZentangleConfig)
+@register_operation("zentangle", config_class=ZentangleConfig)
 class ZentangleFill:
     """
     Generates a zoned doodle fill.
@@ -27,8 +27,7 @@ class ZentangleFill:
     Otherwise, defaults to wavy mathematical bands.
     """
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         spacing = params.spacing
         density = params.density
@@ -36,7 +35,7 @@ class ZentangleFill:
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
 
-        lines = []
+        out_lines = []
         step = max(spacing, density)
 
         def get_zone(x: float, y: float) -> int:
@@ -86,7 +85,7 @@ class ZentangleFill:
                     radius = step * 0.35
                     circle = Point(cx, cy).buffer(radius,
                                                   resolution=12).exterior
-                    lines.append(LineString(circle.coords))
+                    out_lines.append(LineString(circle.coords))
 
                 # ZONE 1: Overlapping Scales/Petals (Medium Shading)
                 elif zone == 1:
@@ -96,7 +95,7 @@ class ZentangleFill:
                         rad = math.radians(theta)
                         scale_points.append((cx + (step * 0.6) * math.cos(rad),
                                              cy + (step * 0.6) * math.sin(rad)))
-                    lines.append(LineString(scale_points))
+                    out_lines.append(LineString(scale_points))
 
                 # ZONE 2: Dense Spirals (Dark Shading)
                 elif zone == 2:
@@ -111,9 +110,9 @@ class ZentangleFill:
                             (cx + r * math.cos(t), cy + r * math.sin(t)))
 
                     if len(spiral_points) > 1:
-                        lines.append(LineString(spiral_points))
+                        out_lines.append(LineString(spiral_points))
 
                 x += step
             y += step
 
-        return lines
+        return lines + out_lines

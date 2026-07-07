@@ -5,7 +5,8 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.ops import unary_union
 
-from cncpen import register_modification
+from cncpen import register_operation
+from shapely.geometry.base import BaseGeometry
 from cncpen import RenderContext
 
 
@@ -13,11 +14,10 @@ class WeldConfig(BaseModel):
     pen_width: float = Field(default=0.2, gt=0.0)
 
 
-@register_modification("weld", config_class=WeldConfig)
+@register_operation("weld", config_class=WeldConfig)
 class WeldMod:
 
-    def apply(self, lines: List[LineString],
-              context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         pen_width = context.config.params.pen_width
 
         # Buffer every line by half the pen width, turning them into polygons

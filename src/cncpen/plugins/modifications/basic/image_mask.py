@@ -4,9 +4,10 @@ from typing import List
 from pydantic import BaseModel
 from pydantic import Field
 from shapely.geometry import LineString
+from shapely.geometry.base import BaseGeometry
 
 from cncpen import ImageSampler
-from cncpen import register_modification
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -15,11 +16,10 @@ class ImageMaskConfig(BaseModel):
     threshold: float = Field(default=0.5)
 
 
-@register_modification("image_mask", config_class=ImageMaskConfig)
+@register_operation("image_mask", config_class=ImageMaskConfig)
 class ImageMaskMod:
 
-    def apply(self, lines: List[LineString],
-              context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
 
         mask_image = params.mask_image

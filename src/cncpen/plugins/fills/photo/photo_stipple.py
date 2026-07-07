@@ -9,7 +9,7 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
 from cncpen import ImageSampler
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -19,11 +19,10 @@ class PhotoStippleConfig(BaseModel):
     sampler: Any = None
 
 
-@register_fill("photo_stipple", config_class=PhotoStippleConfig)
+@register_operation("photo_stipple", config_class=PhotoStippleConfig)
 class PhotoStippleFill:
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         params = context.config.params
         dots = params.dots
         sampler = params.sampler
@@ -33,7 +32,7 @@ class PhotoStippleFill:
             sampler = ImageSampler(image_path, context.bounds)
 
         if not sampler:
-            return []
+            return lines
 
         minx, miny, maxx, maxy = shape.bounds
         width, height = maxx - minx, maxy - miny
@@ -57,4 +56,4 @@ class PhotoStippleFill:
                     LineString([(actual_x, actual_y),
                                 (actual_x + 0.1, actual_y)]))
 
-        return output_paths
+        return lines + output_paths

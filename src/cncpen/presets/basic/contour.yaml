@@ -1,11 +1,11 @@
 fills:
-  - pattern: photo-contour
+  - operation: photo-contour
     image: images/loz.jpg
     levels: 1
     resolution: 0.05
 
-  - modification: simplify
+  - operation: simplify
     tolerance: 0.5
     preserve_topology: false
 
-  - modification: optimize
+  - operation: optimize

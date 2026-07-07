@@ -1,11 +1,11 @@
 fills:
-  - pattern: grid
+  - operation: grid
     cell_size: 30
-  - pattern: peano
+  - operation: peano
     use_previous_lines: true
     polygonize: true
     clip_local: true
     replace_previous: false
     spacing: 10
-  - modification: simplify
+  - operation: simplify
     threshold: 0.2

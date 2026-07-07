@@ -8,7 +8,7 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from cncpen import register_fill
+from cncpen import register_operation
 from cncpen import RenderContext
 
 
@@ -16,12 +16,11 @@ class TriangleConfig(BaseModel):
     cell_size: float = Field(default=5.0, gt=0.0)
 
 
-@register_fill("triangle", config_class=TriangleConfig)
+@register_operation("triangle", config_class=TriangleConfig)
 class TriangleFill:
     """Generates an equilateral triangular (isometric grid) tessellation."""
 
-    def generate(self, shape: BaseGeometry,
-                 context: RenderContext) -> List[LineString]:
+    def process(self, lines: List[LineString], shape: BaseGeometry, context: RenderContext) -> List[LineString]:
         cell_size = context.config.params.cell_size
         minx, miny, maxx, maxy = shape.bounds
         cx, cy = shape.centroid.x, shape.centroid.y
@@ -33,9 +32,9 @@ class TriangleFill:
         # Perpendicular distance between triangle grid lines
         spacing = cell_size * math.sqrt(3.0) / 2.0
         if spacing <= 0:
-            return []
+            return lines
 
-        lines = []
+        out_lines = []
 
         # Generate parallel bounding lines at 0, 60, and 120 degrees
         for angle_deg in [0, 60, 120]:
@@ -58,6 +57,6 @@ class TriangleFill:
                 end_x = px + cos_a * r
                 end_y = py + sin_a * r
 
-                lines.append(LineString([(start_x, start_y), (end_x, end_y)]))
+                out_lines.append(LineString([(start_x, start_y), (end_x, end_y)]))
 
-        return lines
+        return lines + out_lines
